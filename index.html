@@ -1,0 +1,2035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Museum Mystery: QR Scavenger Hunt</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#fbf8f3',
+              100: '#f5efe4',
+              500: '#c59b27',
+              600: '#9e791b',
+              800: '#34260a',
+              900: '#1c1505'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- External Libraries -->
+  <!-- html5-qrcode for live scanning -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <!-- qrcodejs for generating printable high-res codes -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- canvas-confetti for celebrations -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <!-- Tone.js for crisp synthesized audio chimes -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+  <style>
+    @keyframes pulse-glow {
+      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 15px rgba(34, 197, 94, 0.7)); }
+      50% { transform: scale(1.08); filter: drop-shadow(0 0 35px rgba(34, 197, 94, 0.95)); }
+    }
+    .check-glow {
+      animation: pulse-glow 1.4s infinite ease-in-out;
+    }
+    .modal-active {
+      overflow: hidden;
+    }
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #print-area, #print-area * {
+        visibility: visible;
+      }
+      #print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .page-break {
+        page-break-after: always;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-amber-500 selection:text-slate-900">
+
+  <!-- Top Navigation & Student HUD -->
+  <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40 px-4 py-3 shadow-md">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <span class="text-3xl">🏛️</span>
+        <div>
+          <h1 class="font-extrabold text-lg sm:text-xl tracking-tight bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-500 bg-clip-text text-transparent">
+            Museum Mystery: Quest
+          </h1>
+          <p class="text-xs text-slate-400">9 World Museums • 15 Challenge Stations</p>
+        </div>
+      </div>
+
+      <!-- Player HUD badge (Visible when logged in) -->
+      <div id="player-hud" class="hidden flex items-center gap-2 bg-slate-800/90 border border-slate-700/80 rounded-full px-4 py-1.5 shadow-inner">
+        <span id="hud-avatar" class="text-2xl">🕵️</span>
+        <div class="text-left leading-tight pr-2">
+          <div class="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+            <span id="hud-name">Detective</span>
+            <span class="text-[10px] bg-amber-500/20 text-amber-200 px-1.5 py-0.5 rounded font-mono" id="hud-details">Class 1 • #01</span>
+          </div>
+          <div class="text-[11px] text-slate-400">
+            Stations: <span id="hud-progress" class="font-bold text-emerald-400">0/15</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Header Action Controls -->
+      <div class="flex items-center gap-2">
+        <button id="nav-scan-btn" onclick="showView('scan-view')" class="text-xs sm:text-sm font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm">
+          <span>📷</span><span>Scanner</span>
+        </button>
+        <button id="nav-sim-btn" onclick="showView('sim-view')" class="text-xs sm:text-sm font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700 transition flex items-center gap-1">
+          <span>🧪</span><span class="hidden sm:inline">Simulate</span>
+        </button>
+        <button id="nav-report-btn" onclick="showView('report-view')" class="text-xs sm:text-sm font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700 transition flex items-center gap-1">
+          <span>📊</span><span class="hidden sm:inline">Summary</span>
+        </button>
+        
+        <!-- Teacher Protected Controls -->
+        <button onclick="requestAdminAccess('teacher-view')" class="text-xs sm:text-sm font-medium bg-slate-800 hover:bg-slate-700 text-amber-300 px-3 py-1.5 rounded-lg border border-amber-900/40 transition flex items-center gap-1">
+          <span>🖨️</span><span class="hidden md:inline">Print Hub</span>
+        </button>
+        <button onclick="requestAdminAccess('editor-view')" class="text-xs sm:text-sm font-medium bg-slate-800 hover:bg-slate-700 text-indigo-300 px-3 py-1.5 rounded-lg border border-indigo-900/40 transition flex items-center gap-1">
+          <span>✏️</span><span class="hidden md:inline">Edit Questions</span>
+        </button>
+        <button id="nav-lock-btn" onclick="lockAdminSession()" class="hidden text-xs bg-rose-900/80 hover:bg-rose-800 text-rose-200 px-2.5 py-1.5 rounded-lg border border-rose-700 transition flex items-center gap-1" title="Lock Admin Tools">
+          <span>🔒</span><span class="hidden lg:inline">Lock Admin</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Dynamic View Container -->
+  <main class="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 flex flex-col justify-center">
+
+    <!-- 1. STUDENT ONBOARDING VIEW -->
+    <section id="onboarding-view" class="max-w-md mx-auto w-full bg-slate-900/90 border border-slate-800 p-6 sm:p-8 rounded-2xl shadow-2xl text-center space-y-6">
+      <div class="space-y-2">
+        <div class="w-16 h-16 bg-gradient-to-tr from-amber-500 to-yellow-300 rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg shadow-amber-500/20">
+          📜
+        </div>
+        <h2 class="text-2xl font-bold text-white tracking-tight">Museum Mystery Passport</h2>
+        <p class="text-xs sm:text-sm text-slate-400">
+          Enter your class credentials and begin your expedition across 15 interactive museum stations.
+        </p>
+      </div>
+
+      <form id="onboarding-form" onsubmit="handleOnboarding(event)" class="space-y-4 text-left">
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Class / Grade</label>
+          <input type="text" id="student-class" required placeholder="e.g., Class 702 or Grade 8A" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Seat / Number</label>
+            <input type="text" id="student-number" required placeholder="e.g., 14" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Detective Emoji</label>
+            <select id="student-avatar" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition">
+              <option value="🕵️">🕵️ Detective</option>
+              <option value="🦁">🦁 Lion</option>
+              <option value="🦅">🦅 Falcon</option>
+              <option value="🦉">🦉 Owl</option>
+              <option value="🐬">🐬 Dolphin</option>
+              <option value="🏺">🏺 Artifact</option>
+              <option value="🧭">🧭 Compass</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Full Student Name</label>
+          <input type="text" id="student-name" required placeholder="e.g., Alex Lin" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition">
+        </div>
+
+        <button type="submit" class="w-full py-3.5 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold rounded-xl shadow-lg shadow-amber-500/25 transition transform active:scale-[0.98] flex items-center justify-center gap-2">
+          <span>Start Museum Scavenger Hunt</span>
+          <span>→</span>
+        </button>
+      </form>
+    </section>
+
+    <!-- 2. SCANNER VIEW -->
+    <section id="scan-view" class="hidden space-y-6">
+      <div class="text-center space-y-1">
+        <h2 class="text-xl sm:text-2xl font-bold text-white flex items-center justify-center gap-2">
+          <span>📷</span><span>Scan Museum Station QR Code</span>
+        </h2>
+        <p class="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto">
+          Point your device camera at any station code. When scanned, you'll unlock that museum's challenge question.
+        </p>
+      </div>
+
+      <div class="max-w-md mx-auto bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl relative">
+        <div id="qr-reader" class="w-full bg-black min-h-[300px]"></div>
+        <div id="scanner-status" class="p-3 text-center text-xs text-amber-300 font-mono bg-slate-950/80 border-t border-slate-800">
+          Camera initializing...
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-center gap-3 text-xs text-slate-400">
+        <span>No camera access or paper printouts?</span>
+        <button onclick="showView('sim-view')" class="text-amber-400 hover:underline font-semibold flex items-center gap-1">
+          <span>Use Station Simulator</span><span>→</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- 3. SIMULATOR VIEW (Zero-print testing) -->
+    <section id="sim-view" class="hidden space-y-6">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
+        <div>
+          <h2 class="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
+            <span>🧪</span><span>Virtual Station Simulator</span>
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-400">Click any museum station to simulate scanning its physical QR code.</p>
+        </div>
+        <div class="text-xs bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-full text-slate-300 font-mono">
+          Stations Conquered: <span id="sim-solved-count" class="text-emerald-400 font-bold">0</span>/15
+        </div>
+      </div>
+
+      <div id="stations-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- Rendered dynamically via renderSimulatorGrid() -->
+      </div>
+    </section>
+
+    <!-- 4. ACTIVE QUESTION CHALLENGE VIEW -->
+    <section id="question-view" class="hidden max-w-2xl mx-auto w-full space-y-6">
+      <!-- Station Header Card -->
+      <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-slate-700/80 rounded-2xl p-5 shadow-xl flex items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span id="q-station-badge" class="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              Station #1
+            </span>
+            <span id="q-station-museum" class="text-xs text-slate-400 font-medium">
+              Museum Name
+            </span>
+          </div>
+          <h2 id="q-station-title" class="text-lg sm:text-xl font-extrabold text-white">
+            Station Title
+          </h2>
+        </div>
+        <div class="text-right">
+          <span class="text-xs text-slate-400 uppercase tracking-widest block font-mono">Attempt</span>
+          <span id="q-station-attempt" class="text-xl font-black text-amber-400">#1</span>
+        </div>
+      </div>
+
+      <!-- Question Content & Options Card -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-5">
+        <div class="space-y-4">
+          <h3 id="q-text" class="text-base sm:text-lg font-semibold text-slate-100 leading-snug">
+            Question prompt goes here...
+          </h3>
+
+          <!-- Optional Question Image -->
+          <div id="q-image-container" class="hidden">
+            <img id="q-image" src="" alt="Artifact or Station Graphic" class="max-h-64 mx-auto rounded-xl border border-slate-700 object-contain shadow-md cursor-pointer hover:opacity-95 transition" onclick="zoomImage(this.src)">
+            <p class="text-[11px] text-center text-slate-400 mt-1 italic">Click image to enlarge</p>
+          </div>
+        </div>
+
+        <!-- Multiple Choice Options -->
+        <div id="q-options" class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          <!-- Rendered dynamically -->
+        </div>
+
+        <!-- Feedback & Adaptive Alert Banner -->
+        <div id="q-feedback" class="hidden p-4 rounded-xl text-xs sm:text-sm border transition"></div>
+      </div>
+    </section>
+
+    <!-- 5. SUCCESS & STAFF CLUE GATHERING VIEW -->
+    <section id="success-view" class="hidden max-w-lg mx-auto w-full text-center space-y-6 py-6">
+      <div class="bg-slate-900/90 border border-emerald-500/40 rounded-3xl p-8 shadow-2xl shadow-emerald-500/10 space-y-6">
+        
+        <!-- Glowing Checkmark Animation -->
+        <div class="w-24 h-24 sm:w-28 sm:h-28 mx-auto rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center check-glow">
+          <svg class="w-14 h-14 sm:w-16 sm:h-16 text-emerald-400" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"></path>
+          </svg>
+        </div>
+
+        <div class="space-y-2">
+          <span id="success-station-pill" class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+            Station #1 Cleared
+          </span>
+          <h2 class="text-2xl sm:text-3xl font-black text-white tracking-tight">STATION CLEARED!</h2>
+          <p id="success-museum-name" class="text-sm font-semibold text-amber-300">
+            National Museum of Marine Biology & Aquarium
+          </p>
+        </div>
+
+        <!-- The Physical Paper Clue Instruction Prompt -->
+        <div class="bg-amber-950/40 border-2 border-amber-500/60 rounded-2xl p-5 text-amber-200 text-sm sm:text-base space-y-2 text-left shadow-inner">
+          <div class="flex items-center gap-2 font-bold text-amber-300">
+            <span class="text-2xl">📋</span>
+            <span>NEXT CLUE INSTRUCTION:</span>
+          </div>
+          <p class="leading-relaxed font-medium">
+            Show this green checkmark screen to the <strong class="text-white underline decoration-amber-400 underline-offset-2">museum staff</strong> at the station desk to receive your <strong class="text-white">printed paper clue</strong> and station stamp!
+          </p>
+        </div>
+
+        <div class="pt-2">
+          <button onclick="continueScavengerHunt()" class="w-full py-3.5 px-6 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl shadow-lg shadow-emerald-500/25 transition transform active:scale-[0.98] flex items-center justify-center gap-2">
+            <span>Continue Scavenger Hunt</span>
+            <span>→</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. STUDENT REPORT & CERTIFICATE VIEW -->
+    <section id="report-view" class="hidden space-y-6">
+      <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+        <div>
+          <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+            <span>📊</span><span>Scavenger Performance & Improvement Summary</span>
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-400">Detailed breakdown of answers, resilience, and learning curve metrics.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="window.print()" class="text-xs bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 px-3 py-2 rounded-lg font-medium transition flex items-center gap-1.5">
+            <span>🖨️</span><span>Print Certificate</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Printable Certificate Box -->
+      <div id="print-area" class="bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-amber-500/40 rounded-3xl p-6 sm:p-10 text-center relative overflow-hidden shadow-2xl">
+        <div class="absolute -top-12 -right-12 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl"></div>
+        <div class="absolute -bottom-12 -left-12 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl"></div>
+
+        <div class="relative z-10 space-y-6">
+          <div class="text-4xl">🏛️</div>
+          <div class="space-y-1">
+            <h3 class="text-xs uppercase tracking-widest text-amber-400 font-mono">Official Certificate of Completion</h3>
+            <h1 class="text-2xl sm:text-3xl font-black text-white">Junior Museum Curator & Sleuth</h1>
+          </div>
+
+          <div class="max-w-md mx-auto py-3 border-y border-slate-800 space-y-1 text-slate-300">
+            <p class="text-xs uppercase tracking-wider text-slate-400">Awarded to</p>
+            <h2 id="cert-student-name" class="text-xl sm:text-2xl font-black text-amber-300">Detective</h2>
+            <p id="cert-student-meta" class="text-xs font-mono text-slate-400">Class: 702 • Seat: 14</p>
+          </div>
+
+          <!-- Key Metrics Grid -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl mx-auto pt-2">
+            <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3">
+              <span class="text-[11px] text-slate-400 block font-mono">Stations Cleared</span>
+              <span id="rep-solved" class="text-xl sm:text-2xl font-black text-emerald-400">0/15</span>
+            </div>
+            <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3">
+              <span class="text-[11px] text-slate-400 block font-mono">1st-Try Mastery</span>
+              <span id="rep-first-try" class="text-xl sm:text-2xl font-black text-amber-400">0%</span>
+            </div>
+            <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3">
+              <span class="text-[11px] text-slate-400 block font-mono">Total Attempts</span>
+              <span id="rep-attempts" class="text-xl sm:text-2xl font-black text-indigo-400">0</span>
+            </div>
+            <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3">
+              <span class="text-[11px] text-slate-400 block font-mono">Improvement Index</span>
+              <span id="rep-improvement" class="text-xl sm:text-2xl font-black text-emerald-400">+0%</span>
+            </div>
+          </div>
+
+          <!-- Improvement Narrative -->
+          <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 max-w-2xl mx-auto text-left text-xs sm:text-sm text-slate-300 space-y-1.5">
+            <h4 class="font-bold text-amber-300 flex items-center gap-1.5">
+              <span>📈</span><span>Adaptation & Resilience Analysis</span>
+            </h4>
+            <p id="rep-analysis" class="text-slate-400 leading-relaxed">
+              Complete more stations to see learning curve metrics and resilience audits.
+            </p>
+          </div>
+
+          <!-- Station Detailed Audit Table -->
+          <div class="max-w-3xl mx-auto text-left pt-4">
+            <h4 class="text-xs font-mono uppercase tracking-wider text-slate-400 mb-2">Station Audit Log</h4>
+            <div class="border border-slate-800 rounded-xl overflow-x-auto">
+              <table class="w-full text-left text-xs text-slate-300">
+                <thead class="bg-slate-950 text-slate-400 font-mono border-b border-slate-800">
+                  <tr>
+                    <th class="py-2.5 px-3">Station #</th>
+                    <th class="py-2.5 px-3">Museum & Focus</th>
+                    <th class="py-2.5 px-3">Status</th>
+                    <th class="py-2.5 px-3">Attempts</th>
+                    <th class="py-2.5 px-3">Outcome</th>
+                  </tr>
+                </thead>
+                <tbody id="rep-table-body" class="divide-y divide-slate-800/60 font-sans">
+                  <!-- Rendered dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. TEACHER PRINT HUB (Placards with exact station names) -->
+    <section id="teacher-view" class="hidden space-y-6">
+      <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+        <div>
+          <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+            <span>🖨️</span><span>Teacher QR Print Center</span>
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-400">
+            Print high-resolution station cards with museum logos, cut lines, and QR payload codes.
+          </p>
+        </div>
+        <div class="flex items-center gap-3">
+          <button onclick="window.print()" class="text-xs sm:text-sm bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow">
+            <span>🖨️</span><span>Print All 15 Station Placards</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="print-placards-container" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Rendered dynamically via renderPlacards() -->
+      </div>
+    </section>
+
+    <!-- 8. QUESTION & IMAGE EDITOR VIEW -->
+    <section id="editor-view" class="hidden space-y-6">
+      <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+        <div>
+          <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+            <span>✏️</span><span>Station & Question Content Editor</span>
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-400">
+            Modify question texts, add artifact images, customize choices, or export/import full quiz suites.
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="exportQuestionsJSON()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-lg transition flex items-center gap-1">
+            <span>💾</span><span>Export JSON</span>
+          </button>
+          <label class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-lg transition flex items-center gap-1 cursor-pointer">
+            <span>📂</span><span>Import JSON</span>
+            <input type="file" id="import-json-input" accept=".json" class="hidden" onchange="importQuestionsJSON(event)">
+          </label>
+          <button onclick="promptChangeAdminPIN()" class="text-xs bg-amber-900/60 hover:bg-amber-800 text-amber-200 border border-amber-700/60 px-3 py-1.5 rounded-lg transition">
+            Change PIN
+          </button>
+          <button onclick="resetDefaultQuestions()" class="text-xs bg-rose-900/60 hover:bg-rose-800 text-rose-200 border border-rose-700/60 px-3 py-1.5 rounded-lg transition">
+            Reset Defaults
+          </button>
+        </div>
+      </div>
+
+      <!-- Station Selector for Editing -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+        <label class="text-xs font-mono uppercase text-slate-400">Select Station to Configure:</label>
+        <select id="editor-station-select" onchange="renderEditorForStation(this.value)" class="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm text-amber-300 font-semibold focus:outline-none focus:border-amber-400">
+          <!-- Populated dynamically with stations 1 through 9-B -->
+        </select>
+      </div>
+
+      <!-- Active Station Editor Form Container -->
+      <div id="editor-content-area" class="space-y-6">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- TEACHER/ADMIN PASSCODE GATE MODAL -->
+  <div id="admin-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl relative text-center">
+      <button onclick="closeAdminModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">✕</button>
+      <div class="w-12 h-12 bg-amber-500/20 text-amber-400 rounded-xl flex items-center justify-center text-2xl mx-auto border border-amber-500/30">
+        🔒
+      </div>
+      <div class="space-y-1">
+        <h3 class="text-lg font-bold text-white">Teacher & Admin Access</h3>
+        <p class="text-xs text-amber-300 font-medium">
+          Year the National Palace Museum was founded
+        </p>
+      </div>
+      <form onsubmit="handleAdminAuth(event)" class="space-y-3">
+        <input type="password" id="admin-passcode-input" placeholder="Enter 4-digit year passcode" maxlength="8" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-center text-lg tracking-widest text-white font-mono focus:outline-none focus:border-amber-400" required>
+        <div id="admin-auth-error" class="text-xs text-rose-400 hidden">Incorrect passcode. Try again.</div>
+        <button type="submit" class="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl transition">
+          Unlock Teacher Suite
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- IMAGE LIGHTBOX ZOOM MODAL -->
+  <div id="lightbox-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden" onclick="closeImageZoom()">
+    <div class="relative max-w-3xl max-h-[90vh] flex flex-col items-center">
+      <img id="lightbox-img" src="" alt="Enlarged Artifact" class="max-h-[80vh] w-auto rounded-xl object-contain border border-slate-700 shadow-2xl">
+      <p class="text-xs text-slate-300 mt-2">Click anywhere to close</p>
+    </div>
+  </div>
+
+  <!-- CORE SCRIPT -->
+  <script>
+    /* ==========================================================================
+       1. DATA STRUCTURE: 15 CHALLENGE STATIONS ACROSS 9 MUSEUMS
+       ========================================================================== */
+    const DEFAULT_STATIONS_DATA = [
+      {
+        id: "station-1",
+        label: "Station #1",
+        museum: "National Museum of Marine Biology & Aquarium",
+        title: "Waters of Taiwan & Kuroshio Depths",
+        icon: "🐋",
+        questions: [
+          {
+            id: "q1_1",
+            text: "Which massive marine species is celebrated in the museum's Open Ocean tank and known for its distinct spot patterns?",
+            image: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=800&q=80",
+            options: [
+              { text: "Whale Shark (Rhincodon typus)", image: "" },
+              { text: "Great White Shark", image: "" },
+              { text: "Manta Ray", image: "" },
+              { text: "Beluga Whale", image: "" }
+            ],
+            correct: 0,
+            hint: "Look for the world's largest fish filter-feeder characterized by gentle white star-like spots across its back!"
+          },
+          {
+            id: "q1_2",
+            text: "What vital oceanic warm current sweeps past southern Taiwan, sustaining coral reefs and diverse marine ecosystems?",
+            image: "",
+            options: [
+              { text: "California Current", image: "" },
+              { text: "Kuroshio (Black Current)", image: "" },
+              { text: "Gulf Stream", image: "" },
+              { text: "Oyashio Current", image: "" }
+            ],
+            correct: 1,
+            hint: "It gets its name from the deep indigo, almost blackish color of its clear, nutrient-rich waters."
+          }
+        ]
+      },
+      {
+        id: "station-2",
+        label: "Station #2",
+        museum: "Chimei Museum",
+        title: "Western Antiquities & Musical Virtuosos",
+        icon: "🎻",
+        questions: [
+          {
+            id: "q2_1",
+            text: "Chimei Museum holds one of the world's most renowned collections of which handcrafted musical instrument family?",
+            image: "https://images.unsplash.com/photo-1612225330812-01a9c6b355ec?auto=format&fit=crop&w=800&q=80",
+            options: [
+              { text: "Concert Harpsichords", image: "" },
+              { text: "Antique Violins (Stradivari & Guarneri)", image: "" },
+              { text: "Baroque Pipe Organs", image: "" },
+              { text: "Renaissance Lutes", image: "" }
+            ],
+            correct: 1,
+            hint: "Antonio Stradivari and Giuseppe Guarneri del Gesù are legendary Italian masters of this string instrument."
+          },
+          {
+            id: "q2_2",
+            text: "Which majestic Greek myth is commemorated at the main entrance fountain bridge leading to Chimei Museum?",
+            image: "",
+            options: [
+              { text: "Apollo leaping forth in his solar chariot", image: "" },
+              { text: "Poseidon calming the stormy seas", image: "" },
+              { text: "Perseus holding the Gorgon shield", image: "" },
+              { text: "Hercules slaying the Nemean Lion", image: "" }
+            ],
+            correct: 0,
+            hint: "The Greek sun god who drives his golden chariot across the celestial sphere each morning."
+          }
+        ]
+      },
+      {
+        id: "station-3",
+        label: "Station #3",
+        museum: "Gold Museum",
+        title: "Mining Heritage & Benshan Veins",
+        icon: "🪙",
+        questions: [
+          {
+            id: "q3_1",
+            text: "In the main hall of the Gold Building in Jinguashi, visitors can touch an extraordinary pure gold brick weighing approximately:",
+            image: "https://images.unsplash.com/photo-1610375461246-83df859d849d?auto=format&fit=crop&w=800&q=80",
+            options: [
+              { text: "220.3 kilograms (999.9 pure)", image: "" },
+              { text: "50 kilograms", image: "" },
+              { text: "500 kilograms", image: "" },
+              { text: "15.8 kilograms", image: "" }
+            ],
+            correct: 0,
+            hint: "This colossal gold ingot weighs over 220 kilograms and held a Guinness World Record upon installation!"
+          },
+          {
+            id: "q3_2",
+            text: "Which preserved historical underground tunnel at the Gold Museum allows visitors to walk through real miner tunnels?",
+            image: "",
+            options: [
+              { text: "Benshan Fifth Tunnel", image: "" },
+              { text: "Keelung River Sluice #2", image: "" },
+              { text: "Alishan Railway Shaft", image: "" },
+              { text: "Yangmingshan Sulfur Vent", image: "" }
+            ],
+            correct: 0,
+            hint: "Named after the historic Benshan ore deposit, specifically Tunnel Number 5."
+          }
+        ]
+      },
+      {
+        id: "station-4-A",
+        label: "Station #4-A",
+        museum: "The National Palace Museum",
+        title: "Treasures & Masterpieces of Jade",
+        icon: "🥬",
+        questions: [
+          {
+            id: "q4A_1",
+            text: "Carved from a single piece of half-white, half-green jadeite, what two insects are camouflaged on the Jadeite Cabbage?",
+            image: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Jadeite_Cabbage_with_Insects_20150328.jpg/640px-Jadeite_Cabbage_with_Insects_20150328.jpg",
+            options: [
+              { text: "A locust and a katydid", image: "" },
+              { text: "A honeybee and a butterfly", image: "" },
+              { text: "A mantis and a ladybug", image: "" },
+              { text: "A dragonfly and a cricket", image: "" }
+            ],
+            correct: 0,
+            hint: "These two insects were auspicious imperial symbols representing fertility and numerous descendants."
+          },
+          {
+            id: "q4A_2",
+            text: "The famous Meat-Shaped Stone at the National Palace Museum was ingeniously crafted from which layered natural mineral?",
+            image: "",
+            options: [
+              { text: "Banded Jasper / Chalcedony", image: "" },
+              { text: "Solid Soapstone", image: "" },
+              { text: "Glazed Porcelain", image: "" },
+              { text: "Obsidian Glass", image: "" }
+            ],
+            correct: 0,
+            hint: "The natural stone's strata were dyed and textured to resemble tender braised pork belly."
+          }
+        ]
+      },
+      {
+        id: "station-4-B",
+        label: "Station #4-B",
+        museum: "The National Palace Museum",
+        title: "Bronze, Calligraphy & Imperial Kilns",
+        icon: "🏺",
+        questions: [
+          {
+            id: "q4B_1",
+            text: "The Mao Gong Ding is celebrated worldwide because its inner surface is cast with what historical wonder?",
+            image: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Mao_Gong_Ding_NPM.jpg/640px-Mao_Gong_Ding_NPM.jpg",
+            options: [
+              { text: "The longest bronze inscription in the world (approx 500 characters)", image: "" },
+              { text: "A map of the Great Wall of China", image: "" },
+              { text: "A secret imperial recipe for tea", image: "" },
+              { text: "Star constellations in gold inlay", image: "" }
+            ],
+            correct: 0,
+            hint: "Almost five hundred bronze seal script characters detailing Western Zhou Dynasty governance!"
+          },
+          {
+            id: "q4B_2",
+            text: "Which rare Northern Song dynasty ceramic ware is revered for its sky-blue glaze resembling 'the color of sky after rain'?",
+            image: "",
+            options: [
+              { text: "Ru Ware (汝窯)", image: "" },
+              { text: "Ming Blue-and-White", image: "" },
+              { text: "Tang Sancai Tri-color", image: "" },
+              { text: "Qianlong Cloisonné", image: "" }
+            ],
+            correct: 0,
+            hint: "With fewer than 100 surviving pieces worldwide, this kiln was produced exclusively for Emperor Huizong."
+          }
+        ]
+      },
+      {
+        id: "station-5-A",
+        label: "Station #5-A",
+        museum: "The Louvre",
+        title: "Masterpieces of Antiquity & Renaissance",
+        icon: "🎨",
+        questions: [
+          {
+            id: "q5A_1",
+            text: "Leonardo da Vinci's Mona Lisa is famous for which subtle painting technique that creates soft, smokey transitions?",
+            image: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/640px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg",
+            options: [
+              { text: "Sfumato (smoky blending)", image: "" },
+              { text: "Impasto (thick paint build-up)", image: "" },
+              { text: "Pointillism (dotting)", image: "" },
+              { text: "Woodblock relief printing", image: "" }
+            ],
+            correct: 0,
+            hint: "Derived from the Italian word for 'smoke' or 'evaporated like mist'."
+          },
+          {
+            id: "q5A_2",
+            text: "Perched atop the Daru staircase, which dramatic Hellenistic Greek sculpture personifies winged victory?",
+            image: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Victoire_de_Samothrace_-_Mus%C3%A9e_du_Louvre_LL_354_%3B_Ma_2369.jpg/640px-Victoire_de_Samothrace_-_Mus%C3%A9e_du_Louvre_LL_354_%3B_Ma_2369.jpg",
+            options: [
+              { text: "Winged Victory of Samothrace (Nike)", image: "" },
+              { text: "Venus de Milo", image: "" },
+              { text: "Athena Parthenos", image: "" },
+              { text: "Diana the Huntress", image: "" }
+            ],
+            correct: 0,
+            hint: "Named after the Greek goddess Nike, discovered on the northern Aegean island of Samothrace."
+          }
+        ]
+      },
+      {
+        id: "station-5-B",
+        label: "Station #5-B",
+        museum: "The Louvre",
+        title: "The Grand Palace & Imperial Legacy",
+        icon: "👑",
+        questions: [
+          {
+            id: "q5B_1",
+            text: "Before becoming the world's most visited public art museum, what was the primary original function of the Louvre in the 12th century?",
+            image: "",
+            options: [
+              { text: "A fortified medieval castle fortress along the Seine", image: "" },
+              { text: "A monastery scriptorium", image: "" },
+              { text: "A central municipal food market", image: "" },
+              { text: "An astronomical observatory", image: "" }
+            ],
+            correct: 0,
+            hint: "King Philippe Auguste constructed it as a defensive fortress to protect Paris from Viking and Anglo-Norman raids."
+          },
+          {
+            id: "q5B_2",
+            text: "Who designed the modern glass and metal pyramid entrance inaugurated in the Cour Napoléon in 1989?",
+            image: "",
+            options: [
+              { text: "I. M. Pei (Ieoh Ming Pei)", image: "" },
+              { text: "Gustave Eiffel", image: "" },
+              { text: "Le Corbusier", image: "" },
+              { text: "Frank Gehry", image: "" }
+            ],
+            correct: 0,
+            hint: "The world-famous Chinese-American architect who also designed Taipei's Tunghai Luce Memorial Chapel."
+          }
+        ]
+      },
+      {
+        id: "station-6-A",
+        label: "Station #6-A",
+        museum: "Egyptian Museum",
+        title: "Treasures of Tutankhamun",
+        icon: "⚱️",
+        questions: [
+          {
+            id: "q6A_1",
+            text: "In 1922, which British archaeologist made the sensational discovery of King Tutankhamun's nearly intact tomb (KV62)?",
+            image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/Tutankhamun_death_mask_front.jpg/640px-Tutankhamun_death_mask_front.jpg",
+            options: [
+              { text: "Howard Carter (funded by Lord Carnarvon)", image: "" },
+              { text: "Jean-François Champollion", image: "" },
+              { text: "Heinrich Schliemann", image: "" },
+              { text: "Arthur Evans", image: "" }
+            ],
+            correct: 0,
+            hint: "When asked if he could see anything in the candlelit chamber, he famously replied: 'Yes, wonderful things!'"
+          },
+          {
+            id: "q6A_2",
+            text: "What precious dark-blue gemstone, prized across ancient kingdoms, is inlaid into King Tut's gold death mask for the eye surrounds and stripes?",
+            image: "",
+            options: [
+              { text: "Lapis Lazuli", image: "" },
+              { text: "Blue Diamond", image: "" },
+              { text: "Sapphire", image: "" },
+              { text: "Tanzanite", image: "" }
+            ],
+            correct: 0,
+            hint: "This intense azure semi-precious stone was traded along ancient routes from the Badakhshan mines of modern Afghanistan."
+          }
+        ]
+      },
+      {
+        id: "station-6-B",
+        label: "Station #6-B",
+        museum: "Egyptian Museum",
+        title: "Old Kingdom & Dynastic Wonders",
+        icon: "🪨",
+        questions: [
+          {
+            id: "q6B_1",
+            text: "The Narmer Palette, a cornerstone artifact in the museum, is historically renowned for depicting:",
+            image: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Narmer_Palette_front.png/640px-Narmer_Palette_front.png",
+            options: [
+              { text: "The unification of Upper and Lower Egypt (c. 3100 BCE)", image: "" },
+              { text: "The architectural blueprints for the Great Pyramid", image: "" },
+              { text: "The recipe for mummification balsams", image: "" },
+              { text: "A stellar eclipse constellation chart", image: "" }
+            ],
+            correct: 0,
+            hint: "King Narmer is shown wearing both the White Crown of Upper Egypt and the Red Crown of Lower Egypt."
+          },
+          {
+            id: "q6B_2",
+            text: "What distinct natural material was commonly ground into green and black kohl makeup stored in dynastic cosmetic vessels?",
+            image: "",
+            options: [
+              { text: "Malachite (green) and Galena (black)", image: "" },
+              { text: "Crushed river pearls", image: "" },
+              { text: "Charred papyrus reeds", image: "" },
+              { text: "Pulverized turquoise", image: "" }
+            ],
+            correct: 0,
+            hint: "These mineral powders also served medical purposes by reducing sun glare and discouraging eye infections."
+          }
+        ]
+      },
+      {
+        id: "station-7-A",
+        label: "Station #7-A",
+        museum: "The Met",
+        title: "Ancient Dynasties & Sacred Architecture",
+        icon: "🏛️",
+        questions: [
+          {
+            id: "q7A_1",
+            text: "Which authentic ancient sandstone Egyptian temple was dismantled to save it from Lake Nasser flooding and reassembled inside the Met's Sackler Wing?",
+            image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/The_Temple_of_Dendur_at_the_Metropolitan_Museum_of_Art.jpg/640px-The_Temple_of_Dendur_at_the_Metropolitan_Museum_of_Art.jpg",
+            options: [
+              { text: "Temple of Dendur (c. 15 BCE)", image: "" },
+              { text: "Temple of Karnak", image: "" },
+              { text: "Abu Simbel Sanctuary", image: "" },
+              { text: "Philae Isis Chapel", image: "" }
+            ],
+            correct: 0,
+            hint: "Commissioned by Roman Emperor Augustus and gifted by Egypt to the United States in 1965."
+          },
+          {
+            id: "q7A_2",
+            text: "The main building of The Metropolitan Museum of Art sits alongside which iconic New York City landmark?",
+            image: "",
+            options: [
+              { text: "Central Park (along Fifth Avenue)", image: "" },
+              { text: "Times Square", image: "" },
+              { text: "Brooklyn Bridge Promenade", image: "" },
+              { text: "Wall Street Financial District", image: "" }
+            ],
+            correct: 0,
+            hint: "It borders the famous Museum Mile directly in Manhattan's largest public greenspace."
+          }
+        ]
+      },
+      {
+        id: "station-7-B",
+        label: "Station #7-B",
+        museum: "The Met",
+        title: "Arms, Armor & World Paintings",
+        icon: "⚔️",
+        questions: [
+          {
+            id: "q7B_1",
+            text: "In the Met's famous Arms and Armor gallery, what centerpiece equestrian display greets visitors in the grand hall?",
+            image: "https://images.unsplash.com/photo-1595152772835-219674b2a8a6?auto=format&fit=crop&w=800&q=80",
+            options: [
+              { text: "Mounted armored knights on barded horses ready for tournament jousting", image: "" },
+              { text: "Roman gladiator war chariots", image: "" },
+              { text: "Bronze Age siege engines", image: "" },
+              { text: "A fleet of Viking longships", image: "" }
+            ],
+            correct: 0,
+            hint: "Fully articulated steel plate armor engineered for noble knights and their war chargers."
+          },
+          {
+            id: "q7B_2",
+            text: "Which colossal American historical painting by Emanuel Leutze hangs prominently in the Met's American Wing?",
+            image: "",
+            options: [
+              { text: "Washington Crossing the Delaware", image: "" },
+              { text: "The Signing of the Constitution", image: "" },
+              { text: "Surrender of Lord Cornwallis", image: "" },
+              { text: "The Battle of Bunker Hill", image: "" }
+            ],
+            correct: 0,
+            hint: "Depicting General George Washington leading troops across an icy river on Christmas night 1776."
+          }
+        ]
+      },
+      {
+        id: "station-8-A",
+        label: "Station #8-A",
+        museum: "The British Museum",
+        title: "Ancient Civilizations & Deciphering History",
+        icon: "🪨",
+        questions: [
+          {
+            id: "q8A_1",
+            text: "Discovered in 1799, the Rosetta Stone unlocked ancient Egyptian hieroglyphs because its decree was carved in three scripts: Hieroglyphic, Demotic, and:",
+            image: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Rosetta_Stone.JPG/640px-Rosetta_Stone.JPG",
+            options: [
+              { text: "Ancient Greek", image: "" },
+              { text: "Latin", image: "" },
+              { text: "Phoenician", image: "" },
+              { text: "Aramaic", image: "" }
+            ],
+            correct: 0,
+            hint: "Scholars like Jean-François Champollion could read this Hellenistic Mediterranean language and unlock the other two."
+          },
+          {
+            id: "q8A_2",
+            text: "The magnificent soaring glass roof covering the British Museum's Great Court was designed by which renowned architect?",
+            image: "",
+            options: [
+              { text: "Lord Norman Foster (Foster + Partners)", image: "" },
+              { text: "Zaha Hadid", image: "" },
+              { text: "Christopher Wren", image: "" },
+              { text: "Renzo Piano", image: "" }
+            ],
+            correct: 0,
+            hint: "The British architect who also designed the Gherkin tower and Hong Kong's HSBC headquarters."
+          }
+        ]
+      },
+      {
+        id: "station-8-B",
+        label: "Station #8-B",
+        museum: "The British Museum",
+        title: "Medieval Treasures & Global Heritage",
+        icon: "🛡️",
+        questions: [
+          {
+            id: "q8B_1",
+            text: "The Sutton Hoo Anglo-Saxon ship burial treasure in the British Museum is famous for which iconic iron and bronze artifact?",
+            image: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Sutton_Hoo_helmet_2016.png/640px-Sutton_Hoo_helmet_2016.png",
+            options: [
+              { text: "The Sutton Hoo ceremonial fighting helmet with winged dragon face-mask", image: "" },
+              { text: "The Holy Grail chalice", image: "" },
+              { text: "King Arthur's sword Excalibur", image: "" },
+              { text: "A solid platinum crown", image: "" }
+            ],
+            correct: 0,
+            hint: "The helmet features a nose and eyebrow crest forming a flying dragon with garnet-jeweled eyes."
+          },
+          {
+            id: "q8B_2",
+            text: "Carved from walrus ivory and whales' teeth around 1200 CE, what famous gaming pieces are preserved at the museum?",
+            image: "",
+            options: [
+              { text: "The Lewis Chessmen", image: "" },
+              { text: "The Royal Game of Ur", image: "" },
+              { text: "The Senet Dice of Thebes", image: "" },
+              { text: "The Viking Mahjong Tiles", image: "" }
+            ],
+            correct: 0,
+            hint: "Discovered on the Isle of Lewis in Scotland, featuring comical berserkers biting their shields."
+          }
+        ]
+      },
+      {
+        id: "station-9-A",
+        label: "Station #9-A",
+        museum: "The Vatican Museums",
+        title: "The Sistine Chapel & Renaissance Frescoes",
+        icon: "🎨",
+        questions: [
+          {
+            id: "q9A_1",
+            text: "In Michelangelo's famous Sistine Chapel ceiling fresco, what iconic scene depicts the outstretched fingers of God and mankind?",
+            image: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Michelangelo_-_Creation_of_Adam_%28cropped%29.jpg/640px-Michelangelo_-_Creation_of_Adam_%28cropped%29.jpg",
+            options: [
+              { text: "The Creation of Adam", image: "" },
+              { text: "The Expulsion from Eden", image: "" },
+              { text: "Noah's Ark on Mount Ararat", image: "" },
+              { text: "The Sacrifice of Isaac", image: "" }
+            ],
+            correct: 0,
+            hint: "The spark of divine life conveyed through fingertip touch across the central vault panel."
+          },
+          {
+            id: "q9A_2",
+            text: "Covering the altar wall of the Sistine Chapel, which monumental fresco did Michelangelo paint between 1536 and 1541?",
+            image: "",
+            options: [
+              { text: "The Last Judgment", image: "" },
+              { text: "The School of Athens", image: "" },
+              { text: "The Transfiguration", image: "" },
+              { text: "The Battle of Anghiari", image: "" }
+            ],
+            correct: 0,
+            hint: "Depicting the second coming of Christ and the ultimate eternal destiny of all souls."
+          }
+        ]
+      },
+      {
+        id: "station-9-B",
+        label: "Station #9-B",
+        museum: "The Vatican Museums",
+        title: "Papal Galleries & Classical Sculpture",
+        icon: "🏛️",
+        questions: [
+          {
+            id: "q9B_1",
+            text: "Raphael's masterpiece fresco 'The School of Athens' in the Papal Rooms depicts two central Greek philosophers in debate:",
+            image: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/%22The_School_of_Athens%22_by_Raffaello_Sanzio_da_Urbino.jpg/640px-%22The_School_of_Athens%22_by_Raffaello_Sanzio_da_Urbino.jpg",
+            options: [
+              { text: "Plato (pointing upward) and Aristotle (gesturing toward earth)", image: "" },
+              { text: "Socrates and Epicurus", image: "" },
+              { text: "Pythagoras and Archimedes", image: "" },
+              { text: "Herodotus and Homer", image: "" }
+            ],
+            correct: 0,
+            hint: "One philosopher gestures to the spiritual ideal forms above; the other focuses on empirical physical reality below."
+          },
+          {
+            id: "q9B_2",
+            text: "Which ancient Greek marble sculpture group in the Octagonal Court shows a Trojan priest and his sons battling sea serpents?",
+            image: "",
+            options: [
+              { text: "Laocoön and His Sons", image: "" },
+              { text: "The Belvedere Apollo", image: "" },
+              { text: "The Belvedere Torso", image: "" },
+              { text: "The Discophoros", image: "" }
+            ],
+            correct: 0,
+            hint: "He warned his fellow citizens: 'Beware of Greeks bearing gifts' regarding the Trojan Horse."
+          }
+        ]
+      }
+    ];
+
+    /* ==========================================================================
+       2. APP STATE & PERSISTENCE
+       ========================================================================== */
+    const STORAGE_KEY_QUESTIONS = "MUSEUM_MYSTERY_QUESTIONS_V3";
+    const STORAGE_KEY_STUDENT = "MUSEUM_MYSTERY_STUDENT_DATA_V3";
+    const STORAGE_KEY_ADMIN_PIN = "MUSEUM_MYSTERY_ADMIN_PIN_V3";
+
+    let stationsData = [];
+    let studentProfile = null;
+    let studentProgress = {}; 
+    /* studentProgress = {
+         "station-1": { solved: true, attempts: 2, questionHistory: [] }
+       }
+    */
+    let currentStation = null;
+    let currentQuestion = null;
+    let currentAttemptCount = 0;
+    let adminSessionUnlocked = false;
+    let html5QrCodeScanner = null;
+    let scannerActive = false;
+
+    // Load initial data
+    function initializeApp() {
+      // 1. Load questions from localStorage or defaults
+      const savedQuestions = localStorage.getItem(STORAGE_KEY_QUESTIONS);
+      if (savedQuestions) {
+        try {
+          stationsData = JSON.parse(savedQuestions);
+        } catch (e) {
+          console.error("Corrupted question storage, restoring default:", e);
+          stationsData = JSON.parse(JSON.stringify(DEFAULT_STATIONS_DATA));
+        }
+      } else {
+        stationsData = JSON.parse(JSON.stringify(DEFAULT_STATIONS_DATA));
+      }
+
+      // 2. Load student profile and progress
+      const savedStudent = localStorage.getItem(STORAGE_KEY_STUDENT);
+      if (savedStudent) {
+        try {
+          const parsed = JSON.parse(savedStudent);
+          studentProfile = parsed.profile || null;
+          studentProgress = parsed.progress || {};
+        } catch (e) {
+          console.error("Corrupted student data:", e);
+        }
+      }
+
+      // 3. Ensure Teacher Passcode is initialized to 1925 (Year NPM was founded)
+      if (!localStorage.getItem(STORAGE_KEY_ADMIN_PIN)) {
+        localStorage.setItem(STORAGE_KEY_ADMIN_PIN, "1925");
+      }
+
+      // 4. Update HUD
+      updatePlayerHUD();
+
+      // 5. Initial View Navigation
+      if (studentProfile) {
+        showView("sim-view");
+      } else {
+        showView("onboarding-view");
+      }
+    }
+
+    /* ==========================================================================
+       3. NAVIGATION & VIEW CONTROLLER
+       ========================================================================== */
+    const views = [
+      "onboarding-view",
+      "scan-view",
+      "sim-view",
+      "question-view",
+      "success-view",
+      "report-view",
+      "teacher-view",
+      "editor-view"
+    ];
+
+    function showView(viewId) {
+      views.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add("hidden");
+      });
+
+      const target = document.getElementById(viewId);
+      if (target) {
+        target.classList.remove("hidden");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      // Scanner lifecycle management
+      if (viewId === "scan-view") {
+        startScanner();
+      } else {
+        stopScanner();
+      }
+
+      // Simulator dynamic render
+      if (viewId === "sim-view") {
+        renderSimulatorGrid();
+      }
+
+      // Report View render
+      if (viewId === "report-view") {
+        renderPerformanceSummary();
+      }
+
+      // Teacher View render
+      if (viewId === "teacher-view") {
+        renderPlacards();
+      }
+
+      // Editor View render
+      if (viewId === "editor-view") {
+        populateEditorStationSelector();
+      }
+    }
+
+    /* ==========================================================================
+       4. STUDENT ONBOARDING
+       ========================================================================== */
+    function handleOnboarding(event) {
+      event.preventDefault();
+      const sClass = document.getElementById("student-class").value.trim();
+      const sNum = document.getElementById("student-number").value.trim();
+      const sName = document.getElementById("student-name").value.trim();
+      const sAvatar = document.getElementById("student-avatar").value;
+
+      if (!sClass || !sNum || !sName) return;
+
+      studentProfile = {
+        classRoom: sClass,
+        number: sNum,
+        name: sName,
+        avatar: sAvatar,
+        startedAt: new Date().toISOString()
+      };
+
+      saveStudentState();
+      updatePlayerHUD();
+      playToneChime("start");
+      showView("sim-view");
+    }
+
+    function updatePlayerHUD() {
+      const hud = document.getElementById("player-hud");
+      if (!studentProfile) {
+        hud.classList.add("hidden");
+        return;
+      }
+      hud.classList.remove("hidden");
+      document.getElementById("hud-avatar").textContent = studentProfile.avatar;
+      document.getElementById("hud-name").textContent = studentProfile.name;
+      document.getElementById("hud-details").textContent = `${studentProfile.classRoom} • #${studentProfile.number}`;
+
+      const solvedCount = Object.values(studentProgress).filter(p => p.solved).length;
+      document.getElementById("hud-progress").textContent = `${solvedCount}/${stationsData.length}`;
+    }
+
+    function saveStudentState() {
+      localStorage.setItem(STORAGE_KEY_STUDENT, JSON.stringify({
+        profile: studentProfile,
+        progress: studentProgress
+      }));
+    }
+
+    /* ==========================================================================
+       5. SIMULATOR GRID RENDERING
+       ========================================================================== */
+    function renderSimulatorGrid() {
+      const grid = document.getElementById("stations-grid");
+      grid.innerHTML = "";
+
+      const solvedCount = Object.values(studentProgress).filter(p => p.solved).length;
+      document.getElementById("sim-solved-count").textContent = solvedCount;
+
+      stationsData.forEach(st => {
+        const isSolved = studentProgress[st.id]?.solved || false;
+        const attempts = studentProgress[st.id]?.attempts || 0;
+
+        const card = document.createElement("div");
+        card.className = `p-5 rounded-2xl border transition relative overflow-hidden flex flex-col justify-between ${
+          isSolved
+            ? "bg-slate-900/90 border-emerald-500/50 shadow-lg shadow-emerald-500/5"
+            : "bg-slate-900/60 border-slate-800 hover:border-slate-700"
+        }`;
+
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full ${
+                isSolved ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-800 text-amber-300"
+              }">
+                ${st.label}
+              </span>
+              <span class="text-2xl">${st.icon || "🏛️"}</span>
+            </div>
+            <h3 class="text-xs uppercase tracking-wider font-semibold text-slate-400 mb-0.5">${st.museum}</h3>
+            <h4 class="text-base font-bold text-white mb-2">${st.title}</h4>
+            <p class="text-xs text-slate-400">Questions in pool: <span class="font-mono text-slate-300">${st.questions.length}</span></p>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
+            <span class="text-xs font-mono ${isSolved ? "text-emerald-400 font-bold" : "text-slate-400"}">
+              ${isSolved ? `✓ Solved (${attempts} att)` : (attempts > 0 ? `In Progress (${attempts} att)` : "Not Started")}
+            </span>
+            <button onclick="launchStationById('${st.id}')" class="text-xs font-bold px-3 py-1.5 rounded-lg transition ${
+              isSolved
+                ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                : "bg-amber-500 hover:bg-amber-400 text-slate-950 shadow"
+            }">
+              ${isSolved ? "Review Station" : "Scan / Solve"}
+            </button>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    /* ==========================================================================
+       6. QUESTION FLOW ENGINE & ADAPTIVE CYCLE
+       ========================================================================== */
+    function launchStationById(stationId) {
+      const station = stationsData.find(s => s.id === stationId);
+      if (!station) {
+        alert("Station not found: " + stationId);
+        return;
+      }
+      if (!studentProfile) {
+        showView("onboarding-view");
+        return;
+      }
+
+      currentStation = station;
+      if (!studentProgress[station.id]) {
+        studentProgress[station.id] = {
+          solved: false,
+          attempts: 0,
+          history: []
+        };
+      }
+      currentAttemptCount = studentProgress[station.id].attempts;
+
+      // Select initial random question
+      pickAdaptiveQuestion();
+      renderActiveQuestion();
+      showView("question-view");
+    }
+
+    function pickAdaptiveQuestion() {
+      const pool = currentStation.questions;
+      if (!pool || pool.length === 0) {
+        alert("This station currently has no questions configured.");
+        showView("sim-view");
+        return;
+      }
+
+      // If more than 1 question, avoid picking the exact same question as last attempt
+      if (pool.length > 1 && currentQuestion) {
+        const filtered = pool.filter(q => q.id !== currentQuestion.id);
+        const idx = Math.floor(Math.random() * filtered.length);
+        currentQuestion = filtered[idx];
+      } else {
+        const idx = Math.floor(Math.random() * pool.length);
+        currentQuestion = pool[idx];
+      }
+    }
+
+    function renderActiveQuestion() {
+      // Header details
+      document.getElementById("q-station-badge").textContent = currentStation.label;
+      document.getElementById("q-station-museum").textContent = currentStation.museum;
+      document.getElementById("q-station-title").textContent = currentStation.title;
+      document.getElementById("q-station-attempt").textContent = `#${currentAttemptCount + 1}`;
+
+      // Prompt & image
+      document.getElementById("q-text").textContent = currentQuestion.text;
+      
+      const imgCont = document.getElementById("q-image-container");
+      const imgEl = document.getElementById("q-image");
+      if (currentQuestion.image && currentQuestion.image.trim() !== "") {
+        imgEl.src = currentQuestion.image;
+        imgCont.classList.remove("hidden");
+      } else {
+        imgCont.classList.add("hidden");
+      }
+
+      // Render options
+      const optContainer = document.getElementById("q-options");
+      optContainer.innerHTML = "";
+
+      const alphabet = ["A", "B", "C", "D"];
+      currentQuestion.options.forEach((opt, idx) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.onclick = () => submitAnswer(idx);
+        btn.className = "w-full text-left p-3.5 bg-slate-800/80 hover:bg-slate-750 border border-slate-700/80 hover:border-amber-400 rounded-xl transition flex flex-col gap-2 group text-slate-200";
+
+        let optHtml = `
+          <div class="flex items-center gap-3 w-full">
+            <span class="w-7 h-7 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center font-mono font-bold text-xs text-amber-300 group-hover:border-amber-400 transition shrink-0">
+              ${alphabet[idx]}
+            </span>
+            <span class="text-xs sm:text-sm font-medium leading-snug">${opt.text || "Option"}</span>
+          </div>
+        `;
+
+        if (opt.image && opt.image.trim() !== "") {
+          optHtml += `
+            <div class="pl-10 w-full">
+              <img src="${opt.image}" class="max-h-24 w-auto rounded border border-slate-700 object-cover" alt="Choice ${alphabet[idx]} Graphic">
+            </div>
+          `;
+        }
+
+        btn.innerHTML = optHtml;
+        optContainer.appendChild(btn);
+      });
+
+      // Clear feedback banner
+      const feedback = document.getElementById("q-feedback");
+      feedback.classList.add("hidden");
+      feedback.className = "hidden p-4 rounded-xl text-xs sm:text-sm border transition";
+    }
+
+    function submitAnswer(chosenIndex) {
+      currentAttemptCount++;
+      studentProgress[currentStation.id].attempts = currentAttemptCount;
+
+      const isCorrect = chosenIndex === currentQuestion.correct;
+      const feedback = document.getElementById("q-feedback");
+      feedback.classList.remove("hidden");
+
+      // Record answer history
+      studentProgress[currentStation.id].history.push({
+        questionId: currentQuestion.id,
+        chosen: chosenIndex,
+        isCorrect: isCorrect,
+        timestamp: new Date().toISOString()
+      });
+
+      saveStudentState();
+      updatePlayerHUD();
+
+      if (isCorrect) {
+        // Correct answer branch
+        studentProgress[currentStation.id].solved = true;
+        saveStudentState();
+        updatePlayerHUD();
+
+        feedback.className = "p-4 rounded-xl text-xs sm:text-sm border bg-emerald-950/60 border-emerald-500 text-emerald-200 block space-y-1";
+        feedback.innerHTML = `
+          <div class="font-bold text-emerald-300 flex items-center gap-2">
+            <span>✓</span><span>Correct Answer!</span>
+          </div>
+          <p>${currentQuestion.hint || "Mastery achieved on this artifact query."}</p>
+        `;
+
+        playToneChime("correct");
+        triggerConfetti();
+
+        setTimeout(() => {
+          showSuccessScreen();
+        }, 800);
+
+      } else {
+        // Incorrect answer: Adaptive challenge triggered
+        feedback.className = "p-4 rounded-xl text-xs sm:text-sm border bg-rose-950/60 border-rose-500 text-rose-200 block space-y-2";
+        feedback.innerHTML = `
+          <div class="font-bold text-rose-300 flex items-center gap-2">
+            <span>✗</span><span>Not quite right. Let's try another challenge!</span>
+          </div>
+          <p class="text-xs text-rose-300/90 leading-relaxed">
+            <strong>Hint / Curator Note:</strong> ${currentQuestion.hint || "Re-read the question carefully and look for key architectural or historical clues."}
+          </p>
+          <div class="pt-1">
+            <button onclick="cycleAdaptiveQuestion()" class="px-3.5 py-1.5 bg-rose-500 hover:bg-rose-400 text-slate-950 font-bold rounded-lg text-xs transition">
+              Load Alternate Question →
+            </button>
+          </div>
+        `;
+        playToneChime("incorrect");
+      }
+    }
+
+    function cycleAdaptiveQuestion() {
+      pickAdaptiveQuestion();
+      renderActiveQuestion();
+    }
+
+    function showSuccessScreen() {
+      document.getElementById("success-station-pill").textContent = `${currentStation.label} Cleared`;
+      document.getElementById("success-museum-name").textContent = currentStation.museum;
+      showView("success-view");
+    }
+
+    function continueScavengerHunt() {
+      showView("sim-view");
+    }
+
+    /* ==========================================================================
+       7. SCANNER LOGIC (Camera + Payload Parser)
+       ========================================================================== */
+    function startScanner() {
+      const statusEl = document.getElementById("scanner-status");
+      statusEl.textContent = "Requesting camera permissions...";
+
+      if (!html5QrCodeScanner) {
+        html5QrCodeScanner = new Html5Qrcode("qr-reader");
+      }
+
+      Html5Qrcode.getCameras().then(cameras => {
+        if (cameras && cameras.length) {
+          const cameraId = cameras[cameras.length - 1].id; // Back camera on mobile
+          html5QrCodeScanner.start(
+            cameraId,
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 250 }
+            },
+            (decodedText) => {
+              handleDecodedPayload(decodedText);
+            },
+            (error) => {
+              // Ignore standard frame scanning errors
+            }
+          ).then(() => {
+            scannerActive = true;
+            statusEl.textContent = "Camera active. Center the station QR code within the box.";
+          }).catch(err => {
+            statusEl.textContent = "Camera initialization error: " + err;
+          });
+        } else {
+          statusEl.textContent = "No camera devices detected on this hardware.";
+        }
+      }).catch(err => {
+        statusEl.textContent = "Camera access denied or unreadable: " + err;
+      });
+    }
+
+    function stopScanner() {
+      if (html5QrCodeScanner && scannerActive) {
+        html5QrCodeScanner.stop().then(() => {
+          scannerActive = false;
+        }).catch(err => console.error("Error stopping scanner", err));
+      }
+    }
+
+    function handleDecodedPayload(decodedText) {
+      playToneChime("beep");
+      // Format expected: "MUSEUM_STATION:station-1" or simply station-id
+      let targetId = decodedText.trim();
+      if (targetId.startsWith("MUSEUM_STATION:")) {
+        targetId = targetId.replace("MUSEUM_STATION:", "").trim();
+      }
+
+      const match = stationsData.find(s => s.id.toLowerCase() === targetId.toLowerCase() || s.label.toLowerCase() === targetId.toLowerCase());
+      if (match) {
+        stopScanner();
+        launchStationById(match.id);
+      } else {
+        alert("Scanned QR code payload unrecognized: " + decodedText);
+      }
+    }
+
+    /* ==========================================================================
+       8. PERFORMANCE & IMPROVEMENT SUMMARY GENERATOR
+       ========================================================================== */
+    function renderPerformanceSummary() {
+      if (studentProfile) {
+        document.getElementById("cert-student-name").textContent = studentProfile.name;
+        document.getElementById("cert-student-meta").textContent = `Class: ${studentProfile.classRoom} • Seat/No: ${studentProfile.number}`;
+      }
+
+      const totalStations = stationsData.length;
+      let solvedCount = 0;
+      let firstTryCount = 0;
+      let totalAttempts = 0;
+
+      const earlyAttempts = [];
+      const laterAttempts = [];
+
+      const tbody = document.getElementById("rep-table-body");
+      tbody.innerHTML = "";
+
+      stationsData.forEach((st, index) => {
+        const prog = studentProgress[st.id] || { solved: false, attempts: 0, history: [] };
+        if (prog.solved) solvedCount++;
+        if (prog.solved && prog.attempts === 1) firstTryCount++;
+        totalAttempts += prog.attempts;
+
+        // Group into first half vs second half to calculate learning curve
+        if (prog.attempts > 0) {
+          if (index < Math.floor(totalStations / 2)) {
+            earlyAttempts.push(prog.attempts);
+          } else {
+            laterAttempts.push(prog.attempts);
+          }
+        }
+
+        const tr = document.createElement("tr");
+        tr.className = "border-b border-slate-800/40 hover:bg-slate-900/40 transition";
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 font-mono font-bold text-amber-300">${st.label}</td>
+          <td class="py-2.5 px-3">
+            <div class="font-medium text-white">${st.museum}</div>
+            <div class="text-[11px] text-slate-400">${st.title}</div>
+          </td>
+          <td class="py-2.5 px-3">
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+              prog.solved ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-800 text-slate-400"
+            }">
+              ${prog.solved ? "CLEARED" : "PENDING"}
+            </span>
+          </td>
+          <td class="py-2.5 px-3 font-mono">${prog.attempts}</td>
+          <td class="py-2.5 px-3 text-xs">
+            ${prog.solved
+              ? (prog.attempts === 1 ? '<span class="text-amber-400 font-semibold">★ Flawless 1st Try</span>' : `<span class="text-emerald-400">Mastered on Attempt #${prog.attempts}</span>`)
+              : '<span class="text-slate-500">Unanswered</span>'
+            }
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById("rep-solved").textContent = `${solvedCount}/${totalStations}`;
+      const firstTryPct = solvedCount > 0 ? Math.round((firstTryCount / solvedCount) * 100) : 0;
+      document.getElementById("rep-first-try").textContent = `${firstTryPct}%`;
+      document.getElementById("rep-attempts").textContent = totalAttempts;
+
+      // Improvement & Adaptation Metrics
+      const avgEarly = earlyAttempts.length > 0 ? (earlyAttempts.reduce((a, b) => a + b, 0) / earlyAttempts.length) : null;
+      const avgLater = laterAttempts.length > 0 ? (laterAttempts.reduce((a, b) => a + b, 0) / laterAttempts.length) : null;
+
+      let impText = "+0%";
+      let narrative = "As the scavenger hunt progresses, this report will measure your inquiry agility and resilience across stations.";
+
+      if (avgEarly !== null && avgLater !== null) {
+        const delta = avgEarly - avgLater;
+        if (delta > 0) {
+          const pct = Math.round((delta / avgEarly) * 100);
+          impText = `+${pct}% Efficiency`;
+          narrative = `Outstanding cognitive growth! In the first half of the stations, you averaged ${avgEarly.toFixed(1)} attempts per museum. As you honed your research skills, your later stations required only ${avgLater.toFixed(1)} attempts—a ${pct}% increase in question efficiency.`;
+        } else if (delta === 0) {
+          impText = "Consistent";
+          narrative = `Rock-solid steady performance across all museum stations! You maintained consistent focus and analytical rigor from Station #1 through Station #9-B.`;
+        } else {
+          impText = "Resilient";
+          narrative = `The later stations presented higher complexity and deeper curator inquiries, yet you demonstrated steadfast persistence to conquer each challenge.`;
+        }
+      } else if (solvedCount > 0) {
+        narrative = `You have conquered ${solvedCount} museum stations so far. Continue through the remaining stops to reveal full learning curve trends!`;
+      }
+
+      document.getElementById("rep-improvement").textContent = impText;
+      document.getElementById("rep-analysis").textContent = narrative;
+    }
+
+    /* ==========================================================================
+       9. TEACHER QR PRINT HUB (Print placards with clean cutouts)
+       ========================================================================== */
+    function renderPlacards() {
+      const container = document.getElementById("print-placards-container");
+      container.innerHTML = "";
+
+      stationsData.forEach(st => {
+        const payload = `MUSEUM_STATION:${st.id}`;
+        const card = document.createElement("div");
+        card.className = "bg-white text-slate-950 p-6 rounded-2xl border-4 border-slate-900 shadow-xl flex flex-col justify-between space-y-4 page-break";
+        
+        card.innerHTML = `
+          <div class="border-b-2 border-slate-900 pb-3 flex items-start justify-between">
+            <div>
+              <span class="text-xs uppercase tracking-widest font-mono font-bold bg-slate-900 text-amber-300 px-3 py-1 rounded">
+                ${st.label}
+              </span>
+              <h2 class="text-xl font-black text-slate-900 mt-2 leading-tight">${st.museum}</h2>
+              <p class="text-sm font-bold text-slate-700">${st.title}</p>
+            </div>
+            <span class="text-4xl">${st.icon || "🏛️"}</span>
+          </div>
+
+          <div class="flex flex-col sm:flex-row items-center gap-5 justify-center py-2">
+            <div id="qr-box-${st.id}" class="p-2 border-2 border-slate-900 rounded-xl bg-white shadow-sm shrink-0"></div>
+            <div class="text-xs text-slate-700 space-y-2">
+              <p class="font-bold text-slate-900 flex items-center gap-1.5">
+                <span>📱</span><span>INSTRUCTIONS FOR STUDENTS:</span>
+              </p>
+              <ol class="list-decimal list-inside space-y-1 text-[11px] leading-relaxed">
+                <li>Scan this QR code with the scavenger hunt app camera.</li>
+                <li>Answer the station's challenge question.</li>
+                <li>When the <strong>Green Checkmark</strong> appears, show it to the station staff to receive your next printed paper clue!</li>
+              </ol>
+            </div>
+          </div>
+
+          <div class="border-t-2 border-dashed border-slate-300 pt-2 text-[10px] text-slate-500 font-mono flex items-center justify-between">
+            <span>Payload: ${payload}</span>
+            <span>Museum Staff Desk Placard</span>
+          </div>
+        `;
+
+        container.appendChild(card);
+
+        // Generate high-res QR code
+        setTimeout(() => {
+          const targetBox = document.getElementById(`qr-box-${st.id}`);
+          if (targetBox && targetBox.innerHTML === "") {
+            new QRCode(targetBox, {
+              text: payload,
+              width: 140,
+              height: 140,
+              colorDark: "#000000",
+              colorLight: "#ffffff",
+              correctLevel: QRCode.CorrectLevel.H
+            });
+          }
+        }, 50);
+      });
+    }
+
+    /* ==========================================================================
+       10. QUESTION & IMAGE CONTENT EDITOR
+       ========================================================================== */
+    function populateEditorStationSelector() {
+      const select = document.getElementById("editor-station-select");
+      select.innerHTML = "";
+
+      stationsData.forEach(st => {
+        const opt = document.createElement("option");
+        opt.value = st.id;
+        opt.textContent = `${st.label} - ${st.museum}`;
+        select.appendChild(opt);
+      });
+
+      if (stationsData.length > 0) {
+        renderEditorForStation(stationsData[0].id);
+      }
+    }
+
+    function renderEditorForStation(stationId) {
+      const station = stationsData.find(s => s.id === stationId);
+      if (!station) return;
+
+      const container = document.getElementById("editor-content-area");
+      container.innerHTML = "";
+
+      // Station meta settings card
+      const metaCard = document.createElement("div");
+      metaCard.className = "bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4";
+      metaCard.innerHTML = `
+        <div class="flex items-center justify-between">
+          <h3 class="font-bold text-white text-base flex items-center gap-2">
+            <span>🏛️</span><span>Station Attributes: ${station.label}</span>
+          </h3>
+          <span class="text-xs font-mono text-amber-400">ID: ${station.id}</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-mono text-slate-400 mb-1">Museum Name</label>
+            <input type="text" id="ed-st-museum" value="${escapeHtml(station.museum)}" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400">
+          </div>
+          <div>
+            <label class="block text-xs font-mono text-slate-400 mb-1">Station Focus Title</label>
+            <input type="text" id="ed-st-title" value="${escapeHtml(station.title)}" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400">
+          </div>
+        </div>
+        <div class="text-right">
+          <button onclick="saveStationMeta('${station.id}')" class="text-xs bg-slate-800 hover:bg-slate-700 text-amber-300 font-semibold px-4 py-2 rounded-xl transition border border-slate-700">
+            Save Station Details
+          </button>
+        </div>
+      `;
+      container.appendChild(metaCard);
+
+      // Question list for this station
+      station.questions.forEach((q, qIndex) => {
+        const qCard = document.createElement("div");
+        qCard.className = "bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4";
+        
+        let optionsHtml = "";
+        const letters = ["A", "B", "C", "D"];
+        q.options.forEach((opt, oIdx) => {
+          optionsHtml += `
+            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-mono font-bold text-amber-300">Option ${letters[oIdx]}</span>
+                <label class="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer">
+                  <input type="radio" name="ed_correct_${q.id}" value="${oIdx}" ${q.correct === oIdx ? "checked" : ""} class="text-amber-500 focus:ring-amber-400">
+                  <span class="font-semibold text-emerald-400">Is Correct</span>
+                </label>
+              </div>
+              <div>
+                <input type="text" id="ed_opt_text_${q.id}_${oIdx}" value="${escapeHtml(opt.text)}" placeholder="Choice Text" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400">
+              </div>
+              <div>
+                <input type="url" id="ed_opt_img_${q.id}_${oIdx}" value="${escapeHtml(opt.image || '')}" placeholder="Optional Choice Image URL (https://...)" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-amber-400 font-mono">
+              </div>
+            </div>
+          `;
+        });
+
+        qCard.innerHTML = `
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h4 class="font-bold text-amber-300 text-sm">Question #${qIndex + 1}</h4>
+            <button onclick="deleteQuestion('${station.id}', '${q.id}')" class="text-xs text-rose-400 hover:text-rose-300 font-medium">
+              Delete Question
+            </button>
+          </div>
+
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs font-mono text-slate-400 mb-1">Question Prompt</label>
+              <textarea id="ed_q_text_${q.id}" rows="2" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400">${escapeHtml(q.text)}</textarea>
+            </div>
+
+            <div>
+              <label class="block text-xs font-mono text-slate-400 mb-1">Question Image URL (Artifact/Painting)</label>
+              <input type="url" id="ed_q_img_${q.id}" value="${escapeHtml(q.image || '')}" placeholder="https://..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 font-mono focus:outline-none focus:border-amber-400">
+            </div>
+
+            <div>
+              <label class="block text-xs font-mono text-slate-400 mb-1">Curator Hint / Explanation (Shown on incorrect attempt)</label>
+              <input type="text" id="ed_q_hint_${q.id}" value="${escapeHtml(q.hint || '')}" placeholder="Educational guidance..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-amber-400">
+            </div>
+
+            <div class="pt-2">
+              <label class="block text-xs font-mono uppercase text-slate-400 mb-2">Options & Correct Answer Selection</label>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                ${optionsHtml}
+              </div>
+            </div>
+
+            <div class="pt-2 text-right">
+              <button onclick="saveQuestion('${station.id}', '${q.id}')" class="text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl transition shadow">
+                Save Question #${qIndex + 1}
+              </button>
+            </div>
+          </div>
+        `;
+        container.appendChild(qCard);
+      });
+
+      // Add new question button
+      const addBtn = document.createElement("button");
+      addBtn.onclick = () => addNewQuestionToStation(station.id);
+      addBtn.className = "w-full py-3 border-2 border-dashed border-slate-700 hover:border-amber-400 text-slate-300 hover:text-amber-300 rounded-2xl text-xs font-bold transition flex items-center justify-center gap-2";
+      addBtn.innerHTML = `<span>+ Add New Question to Pool</span>`;
+      container.appendChild(addBtn);
+    }
+
+    function saveStationMeta(stationId) {
+      const station = stationsData.find(s => s.id === stationId);
+      if (!station) return;
+
+      station.museum = document.getElementById("ed-st-museum").value.trim();
+      station.title = document.getElementById("ed-st-title").value.trim();
+
+      saveQuestionsToStorage();
+      alert("Station details saved!");
+    }
+
+    function saveQuestion(stationId, qId) {
+      const station = stationsData.find(s => s.id === stationId);
+      if (!station) return;
+      const question = station.questions.find(q => q.id === qId);
+      if (!question) return;
+
+      question.text = document.getElementById(`ed_q_text_${qId}`).value.trim();
+      question.image = document.getElementById(`ed_q_img_${qId}`).value.trim();
+      question.hint = document.getElementById(`ed_q_hint_${qId}`).value.trim();
+
+      const checkedRadio = document.querySelector(`input[name="ed_correct_${qId}"]:checked`);
+      if (checkedRadio) {
+        question.correct = parseInt(checkedRadio.value, 10);
+      }
+
+      [0, 1, 2, 3].forEach(idx => {
+        question.options[idx].text = document.getElementById(`ed_opt_text_${qId}_${idx}`).value.trim();
+        question.options[idx].image = document.getElementById(`ed_opt_img_${qId}_${idx}`).value.trim();
+      });
+
+      saveQuestionsToStorage();
+      alert("Question saved successfully!");
+    }
+
+    function addNewQuestionToStation(stationId) {
+      const station = stationsData.find(s => s.id === stationId);
+      if (!station) return;
+
+      const newQ = {
+        id: "q_" + Date.now(),
+        text: "New museum inquiry question prompt?",
+        image: "",
+        options: [
+          { text: "Option A", image: "" },
+          { text: "Option B", image: "" },
+          { text: "Option C", image: "" },
+          { text: "Option D", image: "" }
+        ],
+        correct: 0,
+        hint: "Curator hint for curious sleuths."
+      };
+
+      station.questions.push(newQ);
+      saveQuestionsToStorage();
+      renderEditorForStation(stationId);
+    }
+
+    function deleteQuestion(stationId, qId) {
+      const station = stationsData.find(s => s.id === stationId);
+      if (!station) return;
+
+      if (station.questions.length <= 1) {
+        alert("Each station must keep at least 1 question.");
+        return;
+      }
+
+      if (confirm("Are you sure you want to delete this question?")) {
+        station.questions = station.questions.filter(q => q.id !== qId);
+        saveQuestionsToStorage();
+        renderEditorForStation(stationId);
+      }
+    }
+
+    function saveQuestionsToStorage() {
+      localStorage.setItem(STORAGE_KEY_QUESTIONS, JSON.stringify(stationsData));
+    }
+
+    function exportQuestionsJSON() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(stationsData, null, 2));
+      const downloadAnchor = document.createElement("a");
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `museum_questions_${new Date().toISOString().slice(0, 10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    function importQuestionsJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            stationsData = parsed;
+            saveQuestionsToStorage();
+            populateEditorStationSelector();
+            alert("Questions suite imported successfully!");
+          } else {
+            alert("Invalid JSON format. Expected an array of stations.");
+          }
+        } catch (err) {
+          alert("Error parsing JSON file: " + err);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function resetDefaultQuestions() {
+      if (confirm("Reset all 15 stations and questions back to original defaults?")) {
+        stationsData = JSON.parse(JSON.stringify(DEFAULT_STATIONS_DATA));
+        saveQuestionsToStorage();
+        populateEditorStationSelector();
+        alert("Reset to defaults complete.");
+      }
+    }
+
+    /* ==========================================================================
+       11. TEACHER PASSCODE SECURITY & AUTH
+       ========================================================================== */
+    let pendingAdminDestination = null;
+
+    function requestAdminAccess(destinationView) {
+      if (adminSessionUnlocked) {
+        showView(destinationView);
+      } else {
+        pendingAdminDestination = destinationView;
+        document.getElementById("admin-passcode-input").value = "";
+        document.getElementById("admin-auth-error").classList.add("hidden");
+        document.getElementById("admin-modal").classList.remove("hidden");
+        setTimeout(() => document.getElementById("admin-passcode-input").focus(), 100);
+      }
+    }
+
+    function handleAdminAuth(event) {
+      event.preventDefault();
+      const entered = document.getElementById("admin-passcode-input").value.trim();
+      const stored = localStorage.getItem(STORAGE_KEY_ADMIN_PIN) || "1925";
+
+      if (entered === stored) {
+        adminSessionUnlocked = true;
+        closeAdminModal();
+        document.getElementById("nav-lock-btn").classList.remove("hidden");
+        playToneChime("correct");
+        if (pendingAdminDestination) {
+          showView(pendingAdminDestination);
+          pendingAdminDestination = null;
+        }
+      } else {
+        playToneChime("incorrect");
+        const errEl = document.getElementById("admin-auth-error");
+        errEl.classList.remove("hidden");
+        errEl.textContent = "Incorrect passcode. Remember the founding year.";
+        document.getElementById("admin-passcode-input").select();
+      }
+    }
+
+    function closeAdminModal() {
+      document.getElementById("admin-modal").classList.add("hidden");
+      pendingAdminDestination = null;
+    }
+
+    function lockAdminSession() {
+      adminSessionUnlocked = false;
+      document.getElementById("nav-lock-btn").classList.add("hidden");
+      showView("sim-view");
+      alert("Teacher tools locked. Passcode required for access.");
+    }
+
+    function promptChangeAdminPIN() {
+      const currentPin = localStorage.getItem(STORAGE_KEY_ADMIN_PIN) || "1925";
+      const oldEntered = prompt("Enter the current admin passcode:");
+      if (oldEntered !== currentPin) {
+        alert("Incorrect current passcode.");
+        return;
+      }
+      const newPin = prompt("Enter new 4 to 8 digit passcode:");
+      if (newPin && newPin.trim().length >= 4) {
+        localStorage.setItem(STORAGE_KEY_ADMIN_PIN, newPin.trim());
+        alert("Teacher passcode successfully updated!");
+      } else {
+        alert("Passcode must be at least 4 characters.");
+      }
+    }
+
+    /* ==========================================================================
+       12. AUDIO & CELEBRATION EFFECTS
+       ========================================================================== */
+    function playToneChime(type) {
+      try {
+        if (Tone.context.state !== "running") {
+          Tone.start();
+        }
+        const synth = new Tone.PolySynth(Tone.Synth).toDestination();
+        synth.volume.value = -8;
+
+        const now = Tone.now();
+        if (type === "correct") {
+          synth.triggerAttackRelease(["C5", "E5", "G5", "C6"], "0.15", now);
+        } else if (type === "incorrect") {
+          synth.triggerAttackRelease(["Eb4", "D4"], "0.25", now);
+        } else if (type === "start") {
+          synth.triggerAttackRelease(["G4", "C5", "E5"], "0.1", now);
+        } else if (type === "beep") {
+          synth.triggerAttackRelease(["A5"], "0.08", now);
+        }
+      } catch (e) {
+        console.warn("Audio unavailable:", e);
+      }
+    }
+
+    function triggerConfetti() {
+      if (typeof confetti === "function") {
+        confetti({
+          particleCount: 70,
+          spread: 60,
+          origin: { y: 0.65 },
+          colors: ["#22c55e", "#fbbf24", "#38bdf8", "#e11d48"]
+        });
+      }
+    }
+
+    /* ==========================================================================
+       13. LIGHTBOX & UTILITIES
+       ========================================================================== */
+    function zoomImage(src) {
+      if (!src) return;
+      document.getElementById("lightbox-img").src = src;
+      document.getElementById("lightbox-modal").classList.remove("hidden");
+    }
+
+    function closeImageZoom() {
+      document.getElementById("lightbox-modal").classList.add("hidden");
+    }
+
+    function escapeHtml(string) {
+      if (!string) return "";
+      return String(string)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // Initialize application on window load
+    window.addEventListener("DOMContentLoaded", initializeApp);
+  </script>
+</body>
+</html>
