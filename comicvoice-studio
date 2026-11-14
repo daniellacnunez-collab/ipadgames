@@ -1,0 +1,2415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Comic Voice Studio - Multi-Student Group Edition</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Bangers for Comic Headers & Comic Neue / Nunito for speech bubbles and UI -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:ital,wght@0,400;0,700;1,700&family=Nunito:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- FontAwesome for crisp icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            comicTitle: ['"Bangers"', 'cursive', 'sans-serif'],
+            comicText: ['"Comic Neue"', 'cursive', 'sans-serif'],
+            sans: ['"Nunito"', 'sans-serif'],
+          },
+          colors: {
+            comicYellow: '#FFD60A',
+            comicBlue: '#0284C7',
+            comicBlueLight: '#E0F2FE',
+            comicCoral: '#F97316',
+            comicCoralLight: '#FFEDD5',
+            comicRed: '#EF233C',
+            comicPaper: '#FFFDF7',
+            comicInk: '#1E293B',
+          },
+          boxShadow: {
+            'comic': '6px 6px 0px 0px #1E293B',
+            'comic-sm': '3px 3px 0px 0px #1E293B',
+            'comic-lg': '10px 10px 0px 0px #1E293B',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Comic Book Halftone & Panel Styling */
+    body {
+      background-color: #F4F1EA;
+      background-image: radial-gradient(#CBD5E1 1.75px, transparent 1.75px);
+      background-size: 20px 20px;
+      color: #1E293B;
+    }
+
+    .comic-border {
+      border: 3.5px solid #1E293B;
+    }
+
+    .comic-border-thick {
+      border: 4px solid #1E293B;
+    }
+
+    .comic-btn {
+      border: 3px solid #1E293B;
+      box-shadow: 4px 4px 0px 0px #1E293B;
+      transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.15s ease;
+    }
+
+    .comic-btn:hover:not(:disabled) {
+      transform: translate(-1px, -1px);
+      box-shadow: 5px 5px 0px 0px #1E293B;
+    }
+
+    .comic-btn:active:not(:disabled) {
+      transform: translate(3px, 3px);
+      box-shadow: 1px 1px 0px 0px #1E293B;
+    }
+
+    .comic-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    /* Speech Bubble Styles for Character 1 (Left Tail) & Character 2 (Right Tail) */
+    .speech-bubble-left {
+      position: relative;
+      border: 3px solid #1E293B;
+      border-radius: 20px;
+      box-shadow: 3px 3px 0px 0px rgba(30, 41, 59, 0.25);
+    }
+
+    .speech-bubble-left::after {
+      content: '';
+      position: absolute;
+      top: -13px;
+      left: 24px;
+      border-width: 0 12px 13px 0;
+      border-style: solid;
+      border-color: transparent transparent #1E293B transparent;
+      display: block;
+      width: 0;
+    }
+
+    .speech-bubble-right {
+      position: relative;
+      border: 3px solid #1E293B;
+      border-radius: 20px;
+      box-shadow: 3px 3px 0px 0px rgba(30, 41, 59, 0.25);
+    }
+
+    .speech-bubble-right::after {
+      content: '';
+      position: absolute;
+      top: -13px;
+      right: 24px;
+      border-width: 0 0 13px 12px;
+      border-style: solid;
+      border-color: transparent transparent #1E293B transparent;
+      display: block;
+      width: 0;
+    }
+
+    /* Active Panel & Bubble Highlighting */
+    .panel-recording {
+      border-color: #EF233C !important;
+      box-shadow: 0 0 0 4px #EF233C, 8px 8px 0px 0px #1E293B !important;
+      transform: scale(1.008);
+    }
+
+    .panel-playing {
+      border-color: #0284C7 !important;
+      box-shadow: 0 0 0 5px #FFD60A, 10px 10px 0px 0px #1E293B !important;
+      transform: scale(1.012);
+    }
+
+    .bubble-speaking {
+      transform: scale(1.02);
+      box-shadow: 0 0 0 4px #FFD60A, 4px 4px 0px 0px #1E293B !important;
+    }
+
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.95; }
+      50% { transform: scale(1.15); opacity: 0.45; }
+      100% { transform: scale(0.95); opacity: 0.95; }
+    }
+
+    .rec-dot-pulse {
+      animation: pulse-ring 1.2s infinite ease-in-out;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #F4F1EA;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1E293B;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans selection:bg-comicYellow selection:text-comicInk">
+
+  <!-- TOP STUDIO HEADER -->
+  <header class="bg-comicYellow comic-border-thick border-t-0 border-x-0 sticky top-0 z-30 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <!-- Logo & Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 bg-comicRed comic-border rounded-xl flex items-center justify-center shadow-comic-sm -rotate-3">
+          <i class="fa-solid fa-masks-theater text-white text-2xl"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-comicTitle text-3xl sm:text-4xl tracking-wider text-comicInk leading-none">
+              COMIC VOICE STUDIO
+            </h1>
+            <span id="studioModeBadge" class="hidden sm:inline-block bg-white comic-border px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wide">
+              iPad Student Booth
+            </span>
+            <span id="cloudSyncBadge" class="bg-slate-200 comic-border px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wide flex items-center gap-1.5">
+              <i class="fa-solid fa-cloud-arrow-up text-comicBlue"></i>
+              <span id="cloudSyncText">Connecting...</span>
+            </span>
+          </div>
+          <p id="studioHeaderSubtitle" class="text-xs sm:text-sm font-bold text-comicInk/85">
+            Each student sees only their own lines on their iPad!
+          </p>
+        </div>
+      </div>
+
+      <!-- Primary Studio Actions -->
+      <div class="flex flex-wrap items-center gap-2 sm:gap-2.5">
+        <!-- Classroom Room Code Pill -->
+        <div class="bg-white comic-border px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-xs sm:text-sm font-black" title="Students on the same room code sync live to the teacher screen">
+          <i class="fa-solid fa-wifi text-emerald-600"></i>
+          <span class="text-slate-500">ROOM:</span>
+          <input id="headerRoomCodeInput" type="text" value="CLASS-1"
+            onchange="changeRoomCode(this.value)"
+            class="w-20 font-mono font-black uppercase text-comicBlue bg-sky-50 border border-comicInk/30 rounded px-1.5 py-0.5 focus:outline-none" />
+        </div>
+
+        <!-- Switch Student / Story Booth Button -->
+        <button onclick="openBoothPicker(true)"
+          class="comic-btn bg-white hover:bg-amber-50 text-comicInk font-black px-3.5 py-2.5 rounded-xl flex items-center gap-2 text-sm">
+          <i class="fa-solid fa-tablet-screen-button text-comicBlue"></i>
+          <span>Switch Student / Story</span>
+        </button>
+
+        <!-- Play Full Comic Button (Director Mode) -->
+        <button id="playFullComicBtn" onclick="togglePlayFullComic()"
+          class="hidden comic-btn bg-emerald-400 hover:bg-emerald-300 text-comicInk font-black px-4 py-2.5 rounded-xl flex items-center gap-2 text-sm sm:text-base">
+          <i id="playFullIcon" class="fa-solid fa-play"></i>
+          <span id="playFullText">Play Full Comic</span>
+        </button>
+
+        <!-- Add Panel Button (Director Mode) -->
+        <button id="addPanelHeaderBtn" onclick="addNewPanel()"
+          class="hidden comic-btn bg-white hover:bg-sky-50 text-comicInk font-extrabold px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 text-sm">
+          <i class="fa-solid fa-plus text-comicBlue"></i>
+          <span class="hidden md:inline">Add Panel</span>
+        </button>
+
+        <!-- Save / Load Full Project JSON (Director Mode) -->
+        <div id="directorProjectBtns" class="hidden flex items-center gap-1.5">
+          <button onclick="saveFullProjectJSON()"
+            class="comic-btn bg-sky-200 hover:bg-sky-300 text-comicInk font-extrabold px-3 py-2.5 rounded-xl flex items-center gap-1.5 text-sm"
+            title="Save entire comic (art, script & all recorded audio) as a .json file">
+            <i class="fa-solid fa-floppy-disk"></i>
+            <span class="hidden lg:inline">Save Project</span>
+          </button>
+
+          <button onclick="triggerLoadFullProject()"
+            class="comic-btn bg-amber-100 hover:bg-amber-200 text-comicInk font-extrabold px-3 py-2.5 rounded-xl flex items-center gap-1.5 text-sm"
+            title="Load a saved comic project or teacher template (.json)">
+            <i class="fa-solid fa-folder-open"></i>
+            <span class="hidden lg:inline">Load Project</span>
+          </button>
+        </div>
+
+        <!-- Help / Guide Button -->
+        <button onclick="toggleGuideModal(true)"
+          class="comic-btn bg-white hover:bg-amber-50 text-comicInk font-bold w-10 h-10 rounded-xl flex items-center justify-center"
+          title="How iPad Student Booth Works">
+          <i class="fa-solid fa-circle-question text-lg"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- IPAD STUDENT BOOTH LAUNCHER MODAL (First Screen Each Student Sees on iPad) -->
+  <div id="ipadBoothPickerModal" class="fixed inset-0 bg-comicInk/80 backdrop-blur-xs z-40 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+    <div class="bg-comicPaper comic-border-thick rounded-3xl max-w-3xl w-full p-5 sm:p-8 shadow-comic-lg my-auto relative">
+      <button id="closeBoothPickerBtn" onclick="openBoothPicker(false)"
+        class="hidden comic-btn bg-slate-200 hover:bg-slate-300 text-comicInk w-10 h-10 rounded-xl flex items-center justify-center absolute top-4 right-4"
+        title="Back to workspace">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+
+      <div class="text-center mb-6">
+        <div class="inline-flex items-center gap-2 bg-comicYellow comic-border px-4 py-1.5 rounded-full text-xs sm:text-sm font-black uppercase tracking-wider mb-3 shadow-comic-sm">
+          <i class="fa-solid fa-tablet-screen-button"></i>
+          <span>iPad Individual Recording Booth</span>
+        </div>
+        <h2 class="font-comicTitle text-4xl sm:text-5xl tracking-wider text-comicInk">
+          PICK YOUR STORY &amp; CHARACTER!
+        </h2>
+        <p class="text-sm sm:text-base font-bold text-slate-600 mt-1">
+          Tap your story and your character below. You will only see <strong>your own lines</strong> to record—and your recordings sync live to the teacher's screen!
+        </p>
+      </div>
+
+      <!-- Step 0: Class Room Code -->
+      <div class="mb-5 bg-sky-50 border-2 border-comicInk rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <span class="text-xs font-black uppercase tracking-wider text-comicBlue block">Classroom Sync Code</span>
+          <span class="text-xs font-bold text-slate-600">Make sure all iPads &amp; the Teacher screen use the same Room Code:</span>
+        </div>
+        <input id="boothRoomCodeInput" type="text" value="CLASS-1"
+          onchange="changeRoomCode(this.value)"
+          class="font-mono font-black text-base uppercase bg-white border-2 border-comicInk rounded-xl px-3 py-1.5 w-full sm:w-40 text-center focus:outline-none" />
+      </div>
+
+      <!-- Step 1: Choose Story -->
+      <div class="mb-6">
+        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+          Step 1: Tap Your Group's Story
+        </label>
+        <div id="boothStoryButtons" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- Step 2: Choose Your Character -->
+      <div class="mb-6">
+        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+          Step 2: Tap Your Character (Opens Your Private Recording Page)
+        </label>
+        <div id="boothCharacterButtons" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- Teacher / Director Full Comic Merge Option -->
+      <div class="pt-4 border-t-2 border-dashed border-slate-300 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <span class="text-xs font-bold text-slate-500 text-center sm:text-left">
+          Finished recording on all iPads? Open Director View to merge everyone's audio packs!
+        </span>
+        <button onclick="enterDirectorMode()"
+          class="comic-btn bg-comicInk hover:bg-slate-800 text-comicYellow font-black px-4 py-2.5 rounded-xl text-xs sm:text-sm flex items-center gap-2 shrink-0">
+          <i class="fa-solid fa-film"></i>
+          <span>Teacher / Merge All Voices</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTIFICATION BANNER -->
+  <div id="toastBanner" class="fixed bottom-5 right-5 z-50 hidden max-w-md transition-all duration-300">
+    <div id="toastContent" class="comic-border bg-white rounded-2xl p-4 shadow-comic flex items-start gap-3">
+      <div id="toastIcon" class="w-8 h-8 rounded-full bg-comicYellow comic-border flex items-center justify-center shrink-0 mt-0.5">
+        <i class="fa-solid fa-bolt text-comicInk"></i>
+      </div>
+      <div class="flex-1">
+        <h4 id="toastTitle" class="font-black text-sm uppercase tracking-wide">Studio Notice</h4>
+        <p id="toastMessage" class="text-sm text-slate-700 mt-0.5 font-medium">Message goes here.</p>
+      </div>
+      <button onclick="hideToast()" class="text-slate-500 hover:text-comicInk p-1">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- MAIN WORKSPACE -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
+
+    <!-- DEDICATED SINGLE-STUDENT IPAD BOOTH HEADER (Visible when a student is in solo mode) -->
+    <section id="studentSoloBanner" class="hidden bg-white comic-border rounded-3xl p-5 sm:p-6 mb-6 shadow-comic">
+      <!-- Populated dynamically by renderStudentSoloView() -->
+    </section>
+
+    <!-- DEDICATED SINGLE-STUDENT ONLY-MY-LINES LIST -->
+    <section id="studentSoloLinesContainer" class="hidden max-w-3xl mx-auto space-y-5">
+      <!-- Populated dynamically by renderStudentSoloView() -->
+    </section>
+
+    <!-- MULTI-STUDENT CAST ROSTER & ROLE FILTER (Director / Teacher View) -->
+    <section id="directorCastSection" class="bg-white comic-border rounded-3xl p-4 sm:p-5 mb-6 shadow-comic">
+      <!-- Top Row: Story Selector, Issue Title & Add Character Button -->
+      <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-4 border-b-2 border-dashed border-slate-300">
+        <div class="flex-1 flex flex-col md:flex-row md:items-center gap-3">
+          <!-- Story / Dialogue Preset Picker -->
+          <div class="flex items-center gap-2 shrink-0">
+            <label for="storyPresetSelect" class="font-comicTitle text-2xl tracking-wide text-comicInk">
+              STORY:
+            </label>
+            <select id="storyPresetSelect" onchange="switchStoryPreset(this.value)"
+              class="font-sans font-extrabold text-xs sm:text-sm bg-comicYellow comic-border rounded-xl px-3 py-2 cursor-pointer focus:outline-none">
+              <option value="story1">Story 1: Tom &amp; Anna (2 Students)</option>
+              <option value="story2">Story 2: Family Housework (4 Students)</option>
+              <option value="story3">Story 3: Ben &amp; Mia (2 Students)</option>
+              <option value="story4">Story 4: Housework Squad (4 Students)</option>
+            </select>
+          </div>
+
+          <div class="flex-1 flex items-center gap-2">
+            <label for="comicStoryTitle" class="font-comicTitle text-xl tracking-wide text-slate-600 shrink-0 hidden sm:inline">
+              TITLE:
+            </label>
+            <input id="comicStoryTitle" type="text" value="STORY 1: HELPING AT HOME (TOM &amp; ANNA)"
+              onchange="updateComicTitle(this.value)"
+              class="w-full font-comicText font-bold text-base sm:text-lg bg-amber-50/80 border-2 border-comicInk rounded-xl px-3 py-1.5 focus:outline-none focus:bg-comicYellow/25"
+              placeholder="Enter comic title..." />
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="addCharacterToCast()"
+            class="comic-btn bg-emerald-300 hover:bg-emerald-400 text-comicInk font-black px-3.5 py-2 rounded-xl text-xs sm:text-sm flex items-center gap-1.5">
+            <i class="fa-solid fa-user-plus"></i>
+            <span>+ Add Character / Student</span>
+          </button>
+
+          <button onclick="triggerImportAudioPack()"
+            class="comic-btn bg-amber-200 hover:bg-amber-300 text-comicInk font-black px-3.5 py-2 rounded-xl text-xs sm:text-sm flex items-center gap-1.5"
+            title="Import & merge any teammate's exported .json voice pack">
+            <i class="fa-solid fa-file-import text-comicBlue"></i>
+            <span>Merge Teammate Audio (.json)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Dynamic View Mode Selector ('Who is recording right now?') -->
+      <div class="py-3.5 border-b-2 border-dashed border-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        <div class="flex items-center gap-2 shrink-0">
+          <span class="w-7 h-7 rounded-lg bg-comicYellow comic-border flex items-center justify-center text-xs">
+            <i class="fa-solid fa-microphone-lines"></i>
+          </span>
+          <span class="text-xs sm:text-sm font-black uppercase tracking-wider text-comicInk">
+            Who is recording right now?
+          </span>
+        </div>
+
+        <!-- Dynamic Filter Pills Rendered Here -->
+        <div id="roleFilterGroup" class="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl border-2 border-comicInk">
+          <!-- Populated dynamically by renderCastSection() -->
+        </div>
+      </div>
+
+      <!-- Dynamic Cast & Students Cards Grid (Supports 2, 3, 4+ Characters) -->
+      <div id="castRosterGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 pt-4">
+        <!-- Populated dynamically by renderCastSection() -->
+      </div>
+
+      <!-- Subtle Status Strip -->
+      <div class="mt-4 pt-2.5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-slate-600">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-circle-info text-comicBlue"></i>
+          <span>Tip: Students can record individually in <strong>iPad Student Booth</strong> mode, then you can click <strong>Merge Teammate Audio (.json)</strong> here to combine everyone's voices!</span>
+        </div>
+        <button onclick="resetToSampleComic()" class="text-comicBlue hover:underline font-extrabold flex items-center gap-1">
+          <i class="fa-solid fa-rotate-left"></i> Reset Current Story
+        </button>
+      </div>
+    </section>
+
+    <!-- ACTIVE RECORDING STUDIO BAR (Appears when recording a speech bubble) -->
+    <div id="liveRecorderDrawer" class="hidden mb-6 bg-comicInk text-white comic-border rounded-2xl p-4 sm:p-5 shadow-comic-lg transition-all">
+      <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
+          <div class="w-12 h-12 rounded-full bg-comicRed flex items-center justify-center rec-dot-pulse shrink-0 border-2 border-white">
+            <i class="fa-solid fa-microphone text-xl text-white"></i>
+          </div>
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="bg-comicRed text-white text-xs font-black px-2 py-0.5 rounded uppercase tracking-wider">ON AIR</span>
+              <h3 id="recordingPanelLabel" class="font-comicTitle text-2xl tracking-wider text-comicYellow">
+                RECORDING DETECTIVE LEO
+              </h3>
+            </div>
+            <p id="recordingScriptPreview" class="font-comicText text-base sm:text-lg text-slate-200 italic mt-0.5">
+              "Read your speech bubble line clearly into the microphone!"
+            </p>
+          </div>
+        </div>
+
+        <!-- Live Waveform Canvas + Timer + Stop Button -->
+        <div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end bg-slate-900/90 p-3 rounded-xl border border-slate-700">
+          <canvas id="waveformCanvas" class="w-36 sm:w-48 h-10 rounded bg-slate-950"></canvas>
+          <div id="recordingTimer" class="font-mono text-xl font-bold text-comicYellow min-w-[60px] text-center">
+            00:00
+          </div>
+          <button onclick="stopRecording()"
+            class="comic-btn bg-comicRed hover:bg-red-500 text-white font-black px-4 py-2 rounded-xl flex items-center gap-2 shrink-0">
+            <i class="fa-solid fa-stop"></i>
+            <span>Stop</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- FULL COMIC PLAYBACK PROGRESS BANNER -->
+    <div id="fullPlaybackBanner" class="hidden mb-6 bg-emerald-400 comic-border rounded-2xl p-3.5 shadow-comic flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-comicInk text-comicYellow flex items-center justify-center animate-bounce">
+          <i class="fa-solid fa-volume-high text-lg"></i>
+        </div>
+        <div>
+          <span class="text-xs font-black uppercase tracking-wider text-comicInk/80">Now Playing Full Comic</span>
+          <h4 id="fullPlaybackStatusText" class="font-comicTitle text-2xl tracking-wide text-comicInk leading-none">
+            Panel 1 - Detective Leo
+          </h4>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="fullPlaybackCounter" class="bg-white comic-border px-3 py-1 rounded-full text-xs font-black">
+          Line 1 of 6
+        </span>
+        <button onclick="stopAllPlayback()" class="comic-btn bg-comicRed text-white font-bold px-3 py-1.5 rounded-xl text-xs">
+          Stop
+        </button>
+      </div>
+    </div>
+
+    <!-- COMIC STRIP GRID (2 Columns on Desktop, 1 on Mobile) -->
+    <div id="comicGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+      <!-- Panels are dynamically rendered here by JS -->
+    </div>
+
+  </main>
+
+  <!-- MULTI-STUDENT COLLABORATION GUIDE MODAL -->
+  <div id="guideModal" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-comicPaper comic-border-thick rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-comic-lg relative max-h-[90vh] overflow-y-auto">
+      <button onclick="toggleGuideModal(false)"
+        class="comic-btn bg-comicRed text-white w-9 h-9 rounded-xl flex items-center justify-center absolute top-4 right-4">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-11 h-11 rounded-xl bg-comicYellow comic-border flex items-center justify-center">
+          <i class="fa-solid fa-users text-xl text-comicInk"></i>
+        </div>
+        <h2 class="font-comicTitle text-3xl tracking-wide text-comicInk">HOW 3+ STUDENTS WORK SEPARATELY</h2>
+      </div>
+
+      <ol class="space-y-3 text-sm sm:text-base text-slate-800">
+        <li class="flex items-start gap-3 bg-white p-3.5 rounded-2xl border-2 border-comicInk">
+          <span class="w-7 h-7 rounded-full bg-comicBlue text-white comic-border font-black flex items-center justify-center shrink-0">1</span>
+          <div>
+            <strong>Set Up Your Cast (3, 4, 5+ Characters):</strong> Customize each character's name, student name, and color badge in the Cast Roster. Need more roles? Click <strong>"+ Add Character / Student"</strong>!
+          </div>
+        </li>
+        <li class="flex items-start gap-3 bg-white p-3.5 rounded-2xl border-2 border-comicInk">
+          <span class="w-7 h-7 rounded-full bg-comicCoral text-white comic-border font-black flex items-center justify-center shrink-0">2</span>
+          <div>
+            <strong>Select Your Role & Record:</strong> In <em>"Who is recording right now?"</em>, click your name. Only your speech bubbles unlock (<span class="font-bold">Your Line!</span>) while teammates' bubbles stay safely locked.
+          </div>
+        </li>
+        <li class="flex items-start gap-3 bg-white p-3.5 rounded-2xl border-2 border-comicInk">
+          <span class="w-7 h-7 rounded-full bg-emerald-500 text-white comic-border font-black flex items-center justify-center shrink-0">3</span>
+          <div>
+            <strong>Export Your Audio Pack (.json):</strong> When finished, click <strong>"Export Audio (.json)"</strong> on your character card and share that small file with your group or teacher.
+          </div>
+        </li>
+        <li class="flex items-start gap-3 bg-white p-3.5 rounded-2xl border-2 border-comicInk">
+          <span class="w-7 h-7 rounded-full bg-comicYellow comic-border font-black flex items-center justify-center shrink-0">4</span>
+          <div>
+            <strong>Merge Every Teammate's Clips:</strong> Click <strong>"Merge Teammate Audio (.json)"</strong> one after another to load Student A, Student B, Student C, and beyond into one master comic—then press <strong>"Play Full Comic"</strong>!
+          </div>
+        </li>
+      </ol>
+
+      <div class="mt-6 flex justify-end">
+        <button onclick="toggleGuideModal(false)"
+          class="comic-btn bg-comicYellow hover:bg-amber-300 text-comicInk font-black px-6 py-2.5 rounded-xl">
+          Got It! Let's Record
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HIDDEN FILE INPUTS -->
+  <input type="file" id="panelImageInput" accept="image/*" class="hidden" />
+  <input type="file" id="importAudioPackInput" accept=".json,application/json" class="hidden" />
+  <input type="file" id="loadFullProjectInput" accept=".json,application/json" class="hidden" />
+
+  <!-- LIVE CLOUD SYNC MODULE (Firebase Auth + Firestore) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'comic-voice-studio-default';
+    let db = null;
+    let auth = null;
+    let currentUser = null;
+    let unsubscribeClips = null;
+
+    // Cache of all cloud clips keyed by `${roomCode}__${storyKey}__${lineId}`
+    window.cloudClipsCache = {};
+
+    function updateSyncStatusBadge(state, label) {
+      const badge = document.getElementById('cloudSyncBadge');
+      const textEl = document.getElementById('cloudSyncText');
+      if (!badge || !textEl) return;
+
+      textEl.textContent = label;
+      badge.className = 'comic-border px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wide flex items-center gap-1.5 ';
+      if (state === 'live') {
+        badge.classList.add('bg-emerald-300', 'text-comicInk');
+      } else if (state === 'syncing') {
+        badge.classList.add('bg-comicYellow', 'text-comicInk');
+      } else {
+        badge.classList.add('bg-slate-200', 'text-slate-700');
+      }
+    }
+
+    async function initCloudSync() {
+      try {
+        if (typeof __firebase_config === 'undefined' || !__firebase_config) {
+          updateSyncStatusBadge('offline', 'Offline Mode');
+          return;
+        }
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+        currentUser = auth.currentUser;
+        if (!currentUser) return;
+
+        subscribeToRoomClips();
+      } catch (err) {
+        console.error('Cloud sync init error:', err);
+        updateSyncStatusBadge('offline', 'Local Mode');
+      }
+    }
+
+    function subscribeToRoomClips() {
+      if (!db || !currentUser) return;
+      if (unsubscribeClips) {
+        unsubscribeClips();
+        unsubscribeClips = null;
+      }
+
+      updateSyncStatusBadge('syncing', 'Syncing...');
+      const clipsColRef = collection(db, 'artifacts', appId, 'public', 'data', 'comic_voice_clips');
+
+      unsubscribeClips = onSnapshot(
+        clipsColRef,
+        (snapshot) => {
+          const activeRoom = (window.getActiveRoomCode ? window.getActiveRoomCode() : 'CLASS-1');
+          const nextCache = {};
+
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            if (data && data.roomCode === activeRoom && data.storyKey && data.lineId) {
+              nextCache[`${data.storyKey}__${data.lineId}`] = data;
+            }
+          });
+
+          window.cloudClipsCache = nextCache;
+          updateSyncStatusBadge('live', `Live Sync (${activeRoom})`);
+          if (typeof window.applyCloudClipsToCurrentStory === 'function') {
+            window.applyCloudClipsToCurrentStory();
+          }
+        },
+        (error) => {
+          console.error('Snapshot listener error:', error);
+          updateSyncStatusBadge('offline', 'Sync Paused');
+        }
+      );
+    }
+
+    window.resubscribeCloudRoom = () => {
+      subscribeToRoomClips();
+    };
+
+    window.saveClipToCloud = async ({ roomCode, storyKey, panelId, lineId, characterId, characterName, studentName, audioDataUrl, duration }) => {
+      if (!db || !currentUser) return false;
+      try {
+        updateSyncStatusBadge('syncing', 'Uploading...');
+        const safeDocId = `${roomCode}__${storyKey}__${lineId}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const clipDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'comic_voice_clips', safeDocId);
+
+        await setDoc(clipDocRef, {
+          roomCode,
+          storyKey,
+          panelId,
+          lineId,
+          characterId,
+          characterName,
+          studentName,
+          audioDataUrl,
+          duration,
+          updatedAt: new Date().toISOString(),
+          uploadedBy: currentUser.uid
+        });
+
+        updateSyncStatusBadge('live', `Live Sync (${roomCode})`);
+        return true;
+      } catch (err) {
+        console.error('Upload clip error:', err);
+        updateSyncStatusBadge('offline', 'Upload Failed');
+        return false;
+      }
+    };
+
+    window.deleteClipFromCloud = async (roomCode, storyKey, lineId) => {
+      if (!db || !currentUser) return;
+      try {
+        const safeDocId = `${roomCode}__${storyKey}__${lineId}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const clipDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'comic_voice_clips', safeDocId);
+        await deleteDoc(clipDocRef);
+      } catch (err) {
+        console.error('Delete clip error:', err);
+      }
+    };
+
+    initCloudSync();
+  </script>
+
+  <!-- JAVASCRIPT APPLICATION LOGIC -->
+  <script>
+    /**
+     * COLOR PALETTE DEFINITIONS FOR DYNAMIC MULTI-CHARACTER CAST
+     */
+    const CHARACTER_COLOR_THEMES = {
+      blue: {
+        label: 'Blue',
+        dotBg: 'bg-sky-600',
+        cardBg: 'bg-sky-50/90',
+        borderAccent: 'border-sky-300',
+        badgeBg: 'bg-sky-600 text-white',
+        bubbleBg: 'bg-sky-50',
+        btnBg: 'bg-sky-600 hover:bg-sky-700 text-white',
+        textAccent: 'text-sky-700'
+      },
+      coral: {
+        label: 'Coral',
+        dotBg: 'bg-orange-500',
+        cardBg: 'bg-orange-50/90',
+        borderAccent: 'border-orange-300',
+        badgeBg: 'bg-orange-500 text-white',
+        bubbleBg: 'bg-orange-50',
+        btnBg: 'bg-orange-500 hover:bg-orange-600 text-white',
+        textAccent: 'text-orange-700'
+      },
+      emerald: {
+        label: 'Emerald',
+        dotBg: 'bg-emerald-600',
+        cardBg: 'bg-emerald-50/90',
+        borderAccent: 'border-emerald-300',
+        badgeBg: 'bg-emerald-600 text-white',
+        bubbleBg: 'bg-emerald-50',
+        btnBg: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+        textAccent: 'text-emerald-700'
+      },
+      purple: {
+        label: 'Purple',
+        dotBg: 'bg-purple-600',
+        cardBg: 'bg-purple-50/90',
+        borderAccent: 'border-purple-300',
+        badgeBg: 'bg-purple-600 text-white',
+        bubbleBg: 'bg-purple-50',
+        btnBg: 'bg-purple-600 hover:bg-purple-700 text-white',
+        textAccent: 'text-purple-700'
+      },
+      amber: {
+        label: 'Amber',
+        dotBg: 'bg-amber-500',
+        cardBg: 'bg-amber-50/90',
+        borderAccent: 'border-amber-300',
+        badgeBg: 'bg-amber-500 text-comicInk',
+        bubbleBg: 'bg-amber-50',
+        btnBg: 'bg-amber-400 hover:bg-amber-500 text-comicInk',
+        textAccent: 'text-amber-700'
+      },
+      pink: {
+        label: 'Pink',
+        dotBg: 'bg-pink-600',
+        cardBg: 'bg-pink-50/90',
+        borderAccent: 'border-pink-300',
+        badgeBg: 'bg-pink-600 text-white',
+        bubbleBg: 'bg-pink-50',
+        btnBg: 'bg-pink-600 hover:bg-pink-700 text-white',
+        textAccent: 'text-pink-700'
+      },
+      teal: {
+        label: 'Teal',
+        dotBg: 'bg-teal-600',
+        cardBg: 'bg-teal-50/90',
+        borderAccent: 'border-teal-300',
+        badgeBg: 'bg-teal-600 text-white',
+        bubbleBg: 'bg-teal-50',
+        btnBg: 'bg-teal-600 hover:bg-teal-700 text-white',
+        textAccent: 'text-teal-700'
+      }
+    };
+
+    const COLOR_KEYS = Object.keys(CHARACTER_COLOR_THEMES);
+
+    /**
+     * HOUSEWORK COMIC PANEL ILLUSTRATIONS (Bedroom, Floor/Toys, Kitchen, Bathroom/Clothes)
+     */
+    const HOUSEWORK_PANEL_ART = {
+      bedroom: `<svg viewBox="0 0 460 220" class="w-full h-full object-cover" xmlns="http://www.w3.org/2000/svg">
+        <rect width="460" height="220" fill="#E0F2FE"/>
+        <rect x="0" y="168" width="460" height="52" fill="#FDE68A" stroke="#1E293B" stroke-width="3.5"/>
+        <!-- Sun Window -->
+        <rect x="35" y="25" width="85" height="75" rx="8" fill="#BAE6FD" stroke="#1E293B" stroke-width="3.5"/>
+        <circle cx="65" cy="52" r="14" fill="#FACC15" stroke="#1E293B" stroke-width="2.5"/>
+        <line x1="77" y1="25" x2="77" y2="100" stroke="#1E293B" stroke-width="3"/>
+        <line x1="35" y1="62" x2="120" y2="62" stroke="#1E293B" stroke-width="3"/>
+        <!-- Neat Made Bed -->
+        <rect x="165" y="95" width="245" height="82" rx="10" fill="#38BDF8" stroke="#1E293B" stroke-width="3.5"/>
+        <rect x="165" y="75" width="24" height="108" rx="5" fill="#92400E" stroke="#1E293B" stroke-width="3.5"/>
+        <rect x="392" y="105" width="18" height="78" rx="4" fill="#92400E" stroke="#1E293B" stroke-width="3.5"/>
+        <rect x="195" y="92" width="52" height="24" rx="8" fill="#FFFFFF" stroke="#1E293B" stroke-width="3"/>
+        <rect x="255" y="95" width="137" height="52" fill="#7DD3FC" stroke="#1E293B" stroke-width="2.5"/>
+        <text x="275" y="65" font-family="Bangers, sans-serif" font-size="24" fill="#0284C7" stroke="#1E293B" stroke-width="0.8">MAKE THE BED!</text>
+      </svg>`,
+
+      floorAndToys: `<svg viewBox="0 0 460 220" class="w-full h-full object-cover" xmlns="http://www.w3.org/2000/svg">
+        <rect width="460" height="220" fill="#FFEDD5"/>
+        <rect x="0" y="165" width="460" height="55" fill="#FED7AA" stroke="#1E293B" stroke-width="3.5"/>
+        <!-- Broom -->
+        <line x1="95" y1="30" x2="125" y2="155" stroke="#92400E" stroke-width="7" stroke-linecap="round"/>
+        <path d="M105,152 L145,152 L155,186 L95,186 Z" fill="#FACC15" stroke="#1E293B" stroke-width="3.5"/>
+        <!-- Vacuum Cleaner -->
+        <rect x="205" y="128" width="68" height="44" rx="18" fill="#EF233C" stroke="#1E293B" stroke-width="3.5"/>
+        <circle cx="222" cy="172" r="11" fill="#1E293B"/>
+        <circle cx="258" cy="172" r="11" fill="#1E293B"/>
+        <path d="M273,145 Q305,115 295,175" fill="none" stroke="#1E293B" stroke-width="5"/>
+        <rect x="280" y="172" width="34" height="12" rx="4" fill="#64748B" stroke="#1E293B" stroke-width="2.5"/>
+        <!-- Toy Box -->
+        <rect x="345" y="115" width="85" height="65" rx="8" fill="#10B981" stroke="#1E293B" stroke-width="3.5"/>
+        <circle cx="372" cy="108" r="14" fill="#F97316" stroke="#1E293B" stroke-width="3"/>
+        <rect x="392" y="96" width="24" height="20" rx="4" fill="#38BDF8" stroke="#1E293B" stroke-width="3"/>
+        <text x="155" y="65" font-family="Bangers, sans-serif" font-size="24" fill="#F97316" stroke="#1E293B" stroke-width="0.8">SWEEP &amp; VACUUM!</text>
+      </svg>`,
+
+      kitchen: `<svg viewBox="0 0 460 220" class="w-full h-full object-cover" xmlns="http://www.w3.org/2000/svg">
+        <rect width="460" height="220" fill="#DCFCE7"/>
+        <rect x="0" y="168" width="460" height="52" fill="#E2E8F0" stroke="#1E293B" stroke-width="3.5"/>
+        <!-- Stove & Cooking Pot -->
+        <rect x="45" y="112" width="110" height="68" rx="6" fill="#FFFFFF" stroke="#1E293B" stroke-width="3.5"/>
+        <rect x="65" y="80" width="70" height="32" rx="6" fill="#EF233C" stroke="#1E293B" stroke-width="3"/>
+        <path d="M85,68 Q92,54 85,42 M112,68 Q119,54 112,42" fill="none" stroke="#64748B" stroke-width="3" stroke-linecap="round"/>
+        <!-- Dining Table & Plates -->
+        <rect x="190" y="128" width="130" height="14" rx="4" fill="#D97706" stroke="#1E293B" stroke-width="3"/>
+        <rect x="210" y="142" width="12" height="38" fill="#92400E" stroke="#1E293B" stroke-width="2.5"/>
+        <rect x="292" y="142" width="12" height="38" fill="#92400E" stroke="#1E293B" stroke-width="2.5"/>
+        <ellipse cx="232" cy="123" rx="18" ry="6" fill="#FFFFFF" stroke="#1E293B" stroke-width="2.5"/>
+        <ellipse cx="278" cy="123" rx="18" ry="6" fill="#FFFFFF" stroke="#1E293B" stroke-width="2.5"/>
+        <!-- Sink & Bubbles -->
+        <rect x="345" y="112" width="85" height="68" rx="6" fill="#BAE6FD" stroke="#1E293B" stroke-width="3.5"/>
+        <circle cx="375" cy="95" r="10" fill="#FFFFFF" fill-opacity="0.85" stroke="#0284C7" stroke-width="2.5"/>
+        <circle cx="398" cy="82" r="13" fill="#FFFFFF" fill-opacity="0.85" stroke="#0284C7" stroke-width="2.5"/>
+        <text x="155" y="55" font-family="Bangers, sans-serif" font-size="24" fill="#16A34A" stroke="#1E293B" stroke-width="0.8">COOK, SET &amp; WASH!</text>
+      </svg>`,
+
+      bathroomAndClothes: `<svg viewBox="0 0 460 220" class="w-full h-full object-cover" xmlns="http://www.w3.org/2000/svg">
+        <rect width="460" height="220" fill="#F3E8FF"/>
+        <rect x="0" y="168" width="460" height="52" fill="#DDD6FE" stroke="#1E293B" stroke-width="3.5"/>
+        <!-- Sparkling Bathroom Tub -->
+        <path d="M45,122 L195,122 L180,175 L60,175 Z" fill="#FFFFFF" stroke="#1E293B" stroke-width="3.5"/>
+        <path d="M180,122 L180,82 Q180,68 164,68" fill="none" stroke="#64748B" stroke-width="6" stroke-linecap="round"/>
+        <text x="85" y="102" font-size="22">✨</text>
+        <text x="135" y="92" font-size="20">🫧</text>
+        <!-- Neat Folded Clothes Stack -->
+        <rect x="265" y="148" width="125" height="24" rx="8" fill="#38BDF8" stroke="#1E293B" stroke-width="3"/>
+        <rect x="272" y="124" width="112" height="24" rx="8" fill="#FACC15" stroke="#1E293B" stroke-width="3"/>
+        <rect x="278" y="100" width="100" height="24" rx="8" fill="#FB7185" stroke="#1E293B" stroke-width="3"/>
+        <text x="135" y="55" font-family="Bangers, sans-serif" font-size="24" fill="#7E22CE" stroke="#1E293B" stroke-width="0.8">CLEAN &amp; FOLD CLOTHES!</text>
+      </svg>`
+    };
+
+    /**
+     * ALL 4 HOUSEWORK DIALOGUE STORIES PROVIDED BY THE USER
+     */
+    const STORY_PRESETS = {
+      story1: {
+        title: 'STORY 1: HELPING AT HOME (TOM & ANNA)',
+        characters: [
+          { id: 's1-tom', name: 'Tom', student: 'Student 1', color: 'blue' },
+          { id: 's1-anna', name: 'Anna', student: 'Student 2', color: 'coral' }
+        ],
+        panels: [
+          {
+            id: 's1-p1',
+            artType: 'svg',
+            artContent: HOUSEWORK_PANEL_ART.bedroom,
+            lines: [
+              { id: 's1-l1', characterId: 's1-tom', text: 'Hi, Anna! Do you help at home?', audioDataUrl: null, duration: 0 },
+              { id: 's1-l2', characterId: 's1-anna', text: 'Yes, I do housework every day. I make the bed in the morning.', audioDataUrl: null, duration: 0 }
+            ]
+          },
+          {
+            id: 's1-p2',
+            artType: 'svg',
+            artContent: HOUSEWORK_PANEL_ART.floorAndToys,
+            lines: [
+              { id: 's1-l3', characterId: 's1-tom', text: 'Me too! What else do you do?', audioDataUrl: null, duration: 0 },
+              { id: 's1-l4', characterId: 's1-anna', text: 'I sweep the floor and vacuum the floor. My little brother has to put away toys. What about you?', audioDataUrl: null, duration: 0 }
+            ]
+          },
+          {
+            id: 's1-p3',
+            artType: 'svg',
+            artContent: HOUSEWORK_PANEL_ART.kitchen,
+            lines: [
+              { id: 's1-l5', characterId: 's1-tom', text: 'I help in the kitchen. My dad and I cook meals. Then, I set the table and wash dishes.', audioDataUrl: null, duration: 0 }
+            ]
+          },
+          {
+            id: 's1-p4',
+            artType: 'svg',
+            artContent: HOUSEWORK_PANEL_ART.bathroomAndClothes,
+            lines: [
+              { id: 's1-l6', characterId: 's1-anna', text: 'That is great! Do you clean the bathroom?', audioDataUrl: null, duration: 0 },
+              { id: 's1-l7', characterId: 's1-tom', text: 'No! My mom does that. I only fold clothes in my room!', audioDataUrl: null, duration: 0 }
+            ]
+          }
+        ]
+      },
+
+      story2: {
+        title: 'STORY 2: FAMILY HOUSEWORK DAY',
+        characters: [
+          { id: 's2-mom', name: 'Mom', student: 'Student 1', color: 'coral' },
+          { id: 's2-dad', name: 'Dad', student: 'Student 2', color: 'blue' },
+          { id: 's2-sam', name: 'Sam', student: 'Student 3', color: 'emerald' },
+          { id: 's2-lily', name: 'Lily', student: 'Student 4', color: 'purple' }
+        ],
+        panels: [
+          {
+            id: 's2-p1',
+            artType: 'svg',
+            artContent: HOUSEWORK_PANEL_ART.floorAndToys,
+            lines: [
+              { id: 's2-l1', characterId: 's2-mom', text: 'Let’s do some housework today!', audioDataUrl: null, duration: 0 },
+              { id: 's2-l2', characterId: 's2-dad', text: 'Okay! I will sweep the floor and vacuum the floor.', audioDataUrl: null, duration: 0 }
+            ]
+          },
+          {
+            id: 's2-p2',
+            artType: 'svg',
+            artContent: HOUSEWORK_PANEL_ART.bedroom,
+            lines: [
+              { id: 's2-l3', characterId: 's2-sam', text: 'I can make the bed and put away toys in my room!', audioDataUrl: null, duration: 0 }
+            ]
+          },
+          {
+            id: 's2-p3',
+            artType: 'svg',
+            artContent: HOUSEWORK_PANEL_ART.bathroomAndClothes,
+            lines: [
+              { id: 's2-l4', characterId: 's2-lily', text: 'I will fold clothes and clean the bathroom.', audioDataUrl: null, duration: 0 }
+            ]
+          },
+          {
+            id: 's2-p4',
+            artType: 'svg',
+            artContent: HOUSEWORK_PANEL_ART.kitchen,
+            lines: [
+              { id: 's2-l5', characterId: 's2-mom', text: 'Thank you! Now I will cook meals for dinner.', audioDataUrl: null, duration: 0 },
+              { id: 's2-l6', characterId: 's2-sam', text: 'And I will set the table!', audioDataUrl: null, duration: 0 },
+              { id: 's2-l7', characterId: 's2-lily', text: 'And I will wash dishes after we eat!', audioDataUrl: null, duration: 0 },
+              { id: 's2-l8', characterId: 's2-dad', text: 'Great job, fam!', audioDataUrl: null, duration: 0 }
+            ]
+          }
+        ]
+      },
+
+      story3: {
+        title: 'STORY 3: MORNING CHORES (BEN & MIA)',
+        characters: [
+          { id: 's3-ben', name: 'Ben', student: 'Student 1', color: 'teal' },
+          { id: 's3-mia', name: 'Mia', student: 'Student 2', color: 'pink' }
+        ],
+        panels: [
+          {
+            id: 's3-p1',
+            artType: 'svg',
+            artContent: HOUSEWORK_PANEL_ART.bedroom,
+            lines: [
+              { id: 's3-l1', characterId: 's3-ben', text: 'Hi, Mia! Do you do housework at home?', audioDataUrl: null, duration: 0 },
+              { id: 's3-l2', characterId: 's3-mia', text: 'Yes! Every morning, I make the bed and put away toys. Then I sweep the floor and vacuum the floor. What about you?', audioDataUrl: null, duration: 0 }
+            ]
+          },
+          {
+            id: 's3-p2',
+            artType: 'svg',
+            artContent: HOUSEWORK_PANEL_ART.kitchen,
+            lines: [
+              { id: 's3-l3', characterId: 's3-ben', text: 'I help in the kitchen. I cook meals with my mom, and I set the table and wash dishes.', audioDataUrl: null, duration: 0 }
+            ]
+          },
+          {
+            id: 's3-p3',
+            artType: 'svg',
+            artContent: HOUSEWORK_PANEL_ART.bathroomAndClothes,
+            lines: [
+              { id: 's3-l4', characterId: 's3-mia', text: 'Nice! Do you clean the bathroom?', audioDataUrl: null, duration: 0 },
+              { id: 's3-l5', characterId: 's3-ben', text: 'No! I only fold clothes in my room!', audioDataUrl: null, duration: 0 }
+            ]
+          }
+        ]
+      },
+
+      story4: {
+        title: 'STORY 4: HOUSEWORK SQUAD (BEN, MIA, TOM & SARA)',
+        characters: [
+          { id: 's4-ben', name: 'Ben', student: 'Student 1', color: 'blue' },
+          { id: 's4-mia', name: 'Mia', student: 'Student 2', color: 'coral' },
+          { id: 's4-tom', name: 'Tom', student: 'Student 3', color: 'emerald' },
+          { id: 's4-sara', name: 'Sara', student: 'Student 4', color: 'amber' }
+        ],
+        panels: [
+          {
+            id: 's4-p1',
+            artType: 'svg',
+            artContent: HOUSEWORK_PANEL_ART.bedroom,
+            lines: [
+              { id: 's4-l1', characterId: 's4-ben', text: 'Hi, everyone! Do you do housework at home?', audioDataUrl: null, duration: 0 },
+              { id: 's4-l2', characterId: 's4-mia', text: 'Yes! I make the bed every morning.', audioDataUrl: null, duration: 0 },
+              { id: 's4-l3', characterId: 's4-tom', text: 'I put away toys in my room.', audioDataUrl: null, duration: 0 }
+            ]
+          },
+          {
+            id: 's4-p2',
+            artType: 'svg',
+            artContent: HOUSEWORK_PANEL_ART.floorAndToys,
+            lines: [
+              { id: 's4-l4', characterId: 's4-sara', text: 'I sweep the floor in the kitchen.', audioDataUrl: null, duration: 0 },
+              { id: 's4-l5', characterId: 's4-ben', text: 'I vacuum the floor in the living room.', audioDataUrl: null, duration: 0 }
+            ]
+          },
+          {
+            id: 's4-p3',
+            artType: 'svg',
+            artContent: HOUSEWORK_PANEL_ART.bathroomAndClothes,
+            lines: [
+              { id: 's4-l6', characterId: 's4-mia', text: 'I clean the bathroom on Saturday.', audioDataUrl: null, duration: 0 },
+              { id: 's4-l7', characterId: 's4-tom', text: 'I fold clothes in my bedroom.', audioDataUrl: null, duration: 0 }
+            ]
+          },
+          {
+            id: 's4-p4',
+            artType: 'svg',
+            artContent: HOUSEWORK_PANEL_ART.kitchen,
+            lines: [
+              { id: 's4-l8', characterId: 's4-sara', text: 'I cook meals with my dad.', audioDataUrl: null, duration: 0 },
+              { id: 's4-l9', characterId: 's4-ben', text: 'I set the table before dinner.', audioDataUrl: null, duration: 0 },
+              { id: 's4-l10', characterId: 's4-mia', text: 'And I wash dishes after dinner!', audioDataUrl: null, duration: 0 }
+            ]
+          }
+        ]
+      }
+    };
+
+    // Active Application State (Starts on Story 1)
+    let activePresetKey = 'story1';
+    let activeRoomCode = 'CLASS-1';
+    let comicState = JSON.parse(JSON.stringify(STORY_PRESETS[activePresetKey]));
+    let studioMode = 'booth'; // 'booth' (Single Student iPad View) | 'director' (Full Comic / Teacher View)
+    let soloCharacterId = comicState.characters[0].id;
+    let activeRoleFilter = 'all'; // 'all' | characterId
+    let activePanelIdForUpload = null;
+
+    window.getActiveRoomCode = () => activeRoomCode;
+
+    function changeRoomCode(newCode) {
+      const cleaned = (newCode || '').trim().toUpperCase().replace(/[^A-Z0-9-]/g, '') || 'CLASS-1';
+      activeRoomCode = cleaned;
+      const headerInput = document.getElementById('headerRoomCodeInput');
+      const boothInput = document.getElementById('boothRoomCodeInput');
+      if (headerInput) headerInput.value = cleaned;
+      if (boothInput) boothInput.value = cleaned;
+
+      // Reset current story before loading clips for the new room
+      comicState = JSON.parse(JSON.stringify(STORY_PRESETS[activePresetKey]));
+      if (typeof window.resubscribeCloudRoom === 'function') {
+        window.resubscribeCloudRoom();
+      }
+      renderAll();
+      showToast('Room Code Updated', `Connected to Classroom Room "${cleaned}".`, 'info');
+    }
+
+    window.applyCloudClipsToCurrentStory = () => {
+      const cache = window.cloudClipsCache || {};
+      let updatedAny = false;
+
+      comicState.panels.forEach((panel) => {
+        panel.lines.forEach((line) => {
+          const cloudEntry = cache[`${activePresetKey}__${line.id}`];
+          if (cloudEntry && cloudEntry.audioDataUrl) {
+            if (line.audioDataUrl !== cloudEntry.audioDataUrl) {
+              line.audioDataUrl = cloudEntry.audioDataUrl;
+              line.duration = cloudEntry.duration || 2;
+              updatedAny = true;
+            }
+            const charObj = comicState.characters.find(c => c.id === line.characterId);
+            if (charObj && cloudEntry.studentName && charObj.student !== cloudEntry.studentName) {
+              charObj.student = cloudEntry.studentName;
+              updatedAny = true;
+            }
+          }
+        });
+      });
+
+      if (updatedAny && !recordingTarget) {
+        renderAll();
+      }
+    };
+
+    // Audio Recording & Playback State
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let recordingTarget = null; // { panelId, lineId }
+    let recordingStartTime = null;
+    let timerInterval = null;
+    let activeStream = null;
+    let audioContext = null;
+    let analyser = null;
+    let animationFrameId = null;
+
+    let currentAudioPlayer = new Audio();
+    let playingTarget = null; // { panelId, lineId }
+    let isPlayingFullComic = false;
+    let fullComicQueue = [];
+    let fullComicTotalLines = 0;
+
+    /**
+     * MICROPHONE RECORDING FOR A SPECIFIC SPEECH BUBBLE
+     */
+    async function startRecordingLine(panelId, lineId) {
+      if (isPlayingFullComic) stopAllPlayback();
+      if (recordingTarget) {
+        stopRecording();
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        activeStream = stream;
+        audioChunks = [];
+        recordingTarget = { panelId, lineId };
+
+        mediaRecorder = new MediaRecorder(stream);
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) {
+            audioChunks.push(event.data);
+          }
+        };
+
+        mediaRecorder.onstop = () => {
+          const mimeType = mediaRecorder.mimeType || 'audio/webm';
+          const audioBlob = new Blob(audioChunks, { type: mimeType });
+          const elapsedSeconds = Math.max(1, Math.round((Date.now() - recordingStartTime) / 1000));
+
+          const reader = new FileReader();
+          reader.onloadend = async () => {
+            const base64Audio = reader.result;
+            const panel = comicState.panels.find(p => p.id === panelId);
+            const line = panel ? panel.lines.find(l => l.id === lineId) : null;
+            const charObj = line ? getCharacterById(line.characterId) : null;
+
+            if (line) {
+              line.audioDataUrl = base64Audio;
+              line.duration = elapsedSeconds;
+            }
+
+            cleanupRecordingResources();
+            renderAll();
+
+            // Automatically push recording to live cloud so teacher sees it immediately
+            if (line && charObj && typeof window.saveClipToCloud === 'function') {
+              const synced = await window.saveClipToCloud({
+                roomCode: activeRoomCode,
+                storyKey: activePresetKey,
+                panelId,
+                lineId,
+                characterId: charObj.id,
+                characterName: charObj.name,
+                studentName: charObj.student,
+                audioDataUrl: base64Audio,
+                duration: elapsedSeconds
+              });
+              if (synced) {
+                showToast('Uploaded Live to Teacher!', `Recorded ${elapsedSeconds}s clip and synced to Room ${activeRoomCode}!`, 'success');
+                return;
+              }
+            }
+
+            showToast('Voice Clip Saved!', `Recorded ${elapsedSeconds}s clip. Click Play to preview!`, 'success');
+          };
+          reader.readAsDataURL(audioBlob);
+        };
+
+        mediaRecorder.start();
+        recordingStartTime = Date.now();
+
+        const panelIdx = comicState.panels.findIndex(p => p.id === panelId);
+        const panel = comicState.panels[panelIdx];
+        const line = panel.lines.find(l => l.id === lineId);
+        const charObj = getCharacterById(line.characterId);
+
+        document.getElementById('liveRecorderDrawer').classList.remove('hidden');
+        document.getElementById('recordingPanelLabel').textContent =
+          `PANEL #${panelIdx + 1} — ${charObj.name.toUpperCase()} (${charObj.student})`;
+        document.getElementById('recordingScriptPreview').textContent = `"${line.text}"`;
+
+        startTimer();
+        startWaveformVisualizer(stream);
+        renderAll();
+
+      } catch (err) {
+        console.error('Microphone error:', err);
+        showToast(
+          'Microphone Access Needed',
+          'Please allow microphone permission in your browser so you can record your voice!',
+          'error'
+        );
+      }
+    }
+
+    function stopRecording() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      } else {
+        cleanupRecordingResources();
+        renderAll();
+      }
+    }
+
+    function cleanupRecordingResources() {
+      recordingTarget = null;
+      clearInterval(timerInterval);
+      timerInterval = null;
+      document.getElementById('recordingTimer').textContent = '00:00';
+      document.getElementById('liveRecorderDrawer').classList.add('hidden');
+
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+      if (audioContext) {
+        audioContext.close().catch(() => {});
+        audioContext = null;
+      }
+      if (activeStream) {
+        activeStream.getTracks().forEach(track => track.stop());
+        activeStream = null;
+      }
+    }
+
+    function startTimer() {
+      const timerEl = document.getElementById('recordingTimer');
+      timerEl.textContent = '00:00';
+      timerInterval = setInterval(() => {
+        const seconds = Math.floor((Date.now() - recordingStartTime) / 1000);
+        timerEl.textContent = formatDuration(seconds);
+      }, 250);
+    }
+
+    function startWaveformVisualizer(stream) {
+      try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(stream);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 64;
+        source.connect(analyser);
+
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        const canvas = document.getElementById('waveformCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function drawWave() {
+          animationFrameId = requestAnimationFrame(drawWave);
+          analyser.getByteFrequencyData(dataArray);
+
+          ctx.fillStyle = '#090D16';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          const barWidth = (canvas.width / bufferLength) * 1.6;
+          let x = 2;
+
+          for (let i = 0; i < bufferLength; i++) {
+            const barHeight = Math.max(4, (dataArray[i] / 255) * canvas.height);
+            ctx.fillStyle = i % 2 === 0 ? '#FFD60A' : '#EF233C';
+            ctx.fillRect(x, (canvas.height - barHeight) / 2, barWidth - 2, barHeight);
+            x += barWidth;
+          }
+        }
+        drawWave();
+      } catch (e) {
+        // Fallback silently if AudioContext is restricted
+      }
+    }
+
+    /**
+     * SINGLE BUBBLE PLAYBACK
+     */
+    function togglePlaySingleLine(panelId, lineId) {
+      if (recordingTarget) return;
+
+      if (playingTarget && playingTarget.lineId === lineId && !isPlayingFullComic) {
+        stopAllPlayback();
+        return;
+      }
+
+      stopAllPlayback();
+
+      const panel = comicState.panels.find(p => p.id === panelId);
+      const line = panel ? panel.lines.find(l => l.id === lineId) : null;
+      if (!line || !line.audioDataUrl) return;
+
+      playingTarget = { panelId, lineId };
+      currentAudioPlayer.src = line.audioDataUrl;
+      currentAudioPlayer.play().catch(() => stopAllPlayback());
+      renderAll();
+
+      currentAudioPlayer.onended = () => {
+        playingTarget = null;
+        renderAll();
+      };
+    }
+
+    /**
+     * FULL COMIC SEQUENTIAL PLAYBACK
+     */
+    function togglePlayFullComic() {
+      if (recordingTarget) {
+        showToast('Stop Recording First', 'Finish recording your active clip before playing the full comic.', 'info');
+        return;
+      }
+
+      if (isPlayingFullComic) {
+        stopAllPlayback();
+        return;
+      }
+
+      const queue = [];
+      comicState.panels.forEach((panel, pIdx) => {
+        panel.lines.forEach((line) => {
+          if (line.audioDataUrl) {
+            queue.push({
+              panelId: panel.id,
+              panelNum: pIdx + 1,
+              line
+            });
+          }
+        });
+      });
+
+      if (queue.length === 0) {
+        showToast(
+          'No Voices Recorded Yet!',
+          'Record at least one speech bubble (or wait for students to record on their iPads) to play the comic!',
+          'info'
+        );
+        return;
+      }
+
+      stopAllPlayback();
+      isPlayingFullComic = true;
+      fullComicQueue = queue;
+      fullComicTotalLines = queue.length;
+
+      updatePlayFullButtonUI(true);
+      document.getElementById('fullPlaybackBanner').classList.remove('hidden');
+      playNextInComicQueue();
+    }
+
+    function playNextInComicQueue() {
+      if (!isPlayingFullComic || fullComicQueue.length === 0) {
+        stopAllPlayback();
+        showToast('The End!', 'Your full multi-character comic finished playing!', 'success');
+        return;
+      }
+
+      const currentItem = fullComicQueue.shift();
+      const currentStep = fullComicTotalLines - fullComicQueue.length;
+      const charObj = getCharacterById(currentItem.line.characterId);
+
+      playingTarget = { panelId: currentItem.panelId, lineId: currentItem.line.id };
+      renderAll();
+
+      document.getElementById('fullPlaybackStatusText').textContent =
+        `Panel #${currentItem.panelNum} — ${charObj.name} (${charObj.student})`;
+      document.getElementById('fullPlaybackCounter').textContent =
+        `Line ${currentStep} of ${fullComicTotalLines}`;
+
+      const cardEl = document.getElementById(`card-${currentItem.panelId}`);
+      if (cardEl) {
+        cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+
+      currentAudioPlayer.src = currentItem.line.audioDataUrl;
+      currentAudioPlayer.play().catch(() => playNextInComicQueue());
+
+      currentAudioPlayer.onended = () => {
+        setTimeout(() => {
+          if (isPlayingFullComic) {
+            playNextInComicQueue();
+          }
+        }, 300);
+      };
+    }
+
+    function stopAllPlayback() {
+      currentAudioPlayer.pause();
+      currentAudioPlayer.currentTime = 0;
+      currentAudioPlayer.onended = null;
+      playingTarget = null;
+      isPlayingFullComic = false;
+      fullComicQueue = [];
+      updatePlayFullButtonUI(false);
+      document.getElementById('fullPlaybackBanner').classList.add('hidden');
+      renderAll();
+    }
+
+    function updatePlayFullButtonUI(isPlaying) {
+      const btn = document.getElementById('playFullComicBtn');
+      const icon = document.getElementById('playFullIcon');
+      const text = document.getElementById('playFullText');
+
+      if (isPlaying) {
+        btn.classList.remove('bg-emerald-400', 'hover:bg-emerald-300');
+        btn.classList.add('bg-comicRed', 'text-white', 'hover:bg-red-500');
+        icon.className = 'fa-solid fa-stop';
+        text.textContent = 'Stop Comic';
+      } else {
+        btn.classList.add('bg-emerald-400', 'hover:bg-emerald-300');
+        btn.classList.remove('bg-comicRed', 'text-white', 'hover:bg-red-500');
+        icon.className = 'fa-solid fa-play';
+        text.textContent = 'Play Full Comic';
+      }
+    }
+
+    /**
+     * MULTI-STUDENT AUDIO PACK EXPORT & MERGE (.json)
+     */
+    function exportRoleAudioPack(charId) {
+      const charObj = getCharacterById(charId);
+      const charIndex = comicState.characters.findIndex(c => c.id === charId);
+      const clips = [];
+
+      comicState.panels.forEach((panel, pIdx) => {
+        panel.lines.forEach((line, lIdx) => {
+          if (line.characterId === charId && line.audioDataUrl) {
+            clips.push({
+              panelId: panel.id,
+              panelIndex: pIdx,
+              lineId: line.id,
+              lineIndex: lIdx,
+              text: line.text,
+              audioDataUrl: line.audioDataUrl,
+              duration: line.duration
+            });
+          }
+        });
+      });
+
+      if (clips.length === 0) {
+        showToast(
+          `No Clips Recorded for ${charObj.name}`,
+          `Record at least one speech bubble for ${charObj.name} before exporting your audio pack!`,
+          'error'
+        );
+        return;
+      }
+
+      const packPayload = {
+        type: 'comic-voice-studio-role-pack',
+        version: 2,
+        comicTitle: comicState.title,
+        characterId: charObj.id,
+        characterIndex: charIndex,
+        characterName: charObj.name,
+        studentName: charObj.student,
+        characterColor: charObj.color,
+        exportedAt: new Date().toISOString(),
+        clips
+      };
+
+      const blob = new Blob([JSON.stringify(packPayload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const slug = `${charObj.student}-${charObj.name}`.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${slug}-audio-pack.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showToast(
+        'Audio Pack Exported!',
+        `Downloaded ${clips.length} voice clip(s) for ${charObj.name} (${charObj.student}).`,
+        'success'
+      );
+    }
+
+    function triggerImportAudioPack() {
+      document.getElementById('importAudioPackInput').click();
+    }
+
+    function handleImportedAudioPack(data) {
+      if (!data || data.type !== 'comic-voice-studio-role-pack' || !Array.isArray(data.clips)) {
+        showToast('Invalid Audio Pack', 'Please select a valid Student Audio Pack (.json) exported from Comic Voice Studio.', 'error');
+        return;
+      }
+
+      let mergedCount = 0;
+
+      data.clips.forEach(clip => {
+        const targetPanel = comicState.panels.find(p => p.id === clip.panelId) || comicState.panels[clip.panelIndex];
+        if (!targetPanel) return;
+
+        const targetLine = targetPanel.lines.find(l => l.id === clip.lineId) || targetPanel.lines[clip.lineIndex];
+        if (!targetLine) return;
+
+        targetLine.audioDataUrl = clip.audioDataUrl;
+        targetLine.duration = clip.duration || 2;
+        if (clip.text) targetLine.text = clip.text;
+        mergedCount++;
+      });
+
+      const matchingChar = comicState.characters.find(c => c.id === data.characterId) || comicState.characters[data.characterIndex];
+      if (matchingChar && data.studentName) {
+        matchingChar.student = data.studentName;
+      }
+
+      renderAll();
+      showToast(
+        'Teammate Audio Merged!',
+        `Successfully imported ${mergedCount} voice clip(s) from ${data.studentName || 'Teammate'} (${data.characterName || 'Character'}).`,
+        'success'
+      );
+    }
+
+    /**
+     * FULL PROJECT SAVE & LOAD (.json)
+     */
+    function saveFullProjectJSON() {
+      const projectData = {
+        type: 'comic-voice-studio-full-project',
+        version: 1,
+        savedAt: new Date().toISOString(),
+        state: comicState
+      };
+
+      const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const slug = (comicState.title || 'comic-project').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${slug}-full-project.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showToast('Full Project Saved!', 'Saved comic artwork, script, and all recorded audio clips to a .json file.', 'success');
+    }
+
+    function triggerLoadFullProject() {
+      document.getElementById('loadFullProjectInput').click();
+    }
+
+    /**
+     * PANEL, CAST & SPEECH BUBBLE EDITING HELPERS
+     */
+    function getCharacterById(charId) {
+      return comicState.characters.find(c => c.id === charId) || comicState.characters[0];
+    }
+
+    function getCharacterTheme(charObj) {
+      return CHARACTER_COLOR_THEMES[charObj && charObj.color] || CHARACTER_COLOR_THEMES.blue;
+    }
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function formatDuration(seconds) {
+      const secs = Math.max(0, Math.floor(seconds || 0));
+      const mins = Math.floor(secs / 60);
+      const rem = secs % 60;
+      return `${String(mins).padStart(2, '0')}:${String(rem).padStart(2, '0')}`;
+    }
+
+    function switchStoryPreset(presetKey) {
+      if (!STORY_PRESETS[presetKey]) return;
+      stopAllPlayback();
+      if (recordingTarget) stopRecording();
+
+      activePresetKey = presetKey;
+      comicState = JSON.parse(JSON.stringify(STORY_PRESETS[presetKey]));
+      soloCharacterId = comicState.characters[0].id;
+      activeRoleFilter = 'all';
+
+      const titleInput = document.getElementById('comicStoryTitle');
+      if (titleInput) titleInput.value = comicState.title;
+
+      const selectEl = document.getElementById('storyPresetSelect');
+      if (selectEl) selectEl.value = presetKey;
+
+      if (typeof window.applyCloudClipsToCurrentStory === 'function') {
+        window.applyCloudClipsToCurrentStory();
+      }
+
+      renderAll();
+      showToast('Story Loaded!', `Switched to "${comicState.title}".`, 'success');
+    }
+
+    function resetToSampleComic() {
+      switchStoryPreset(activePresetKey);
+    }
+
+    function updateComicTitle(newTitle) {
+      comicState.title = newTitle.trim() || 'UNTITLED COMIC';
+    }
+
+    function setRoleFilter(role) {
+      activeRoleFilter = role;
+      renderAll();
+    }
+
+    function cycleCharacterColor(charId) {
+      const charObj = comicState.characters.find(c => c.id === charId);
+      if (!charObj) return;
+      const idx = COLOR_KEYS.indexOf(charObj.color);
+      charObj.color = COLOR_KEYS[(idx + 1) % COLOR_KEYS.length];
+      renderAll();
+    }
+
+    function addCharacterToCast() {
+      const nextNum = comicState.characters.length + 1;
+      const colorKey = COLOR_KEYS[(nextNum - 1) % COLOR_KEYS.length];
+      const newChar = {
+        id: 'char-' + Date.now(),
+        name: `Character ${nextNum}`,
+        student: `Student ${nextNum}`,
+        color: colorKey
+      };
+      comicState.characters.push(newChar);
+      renderAll();
+      showToast('Character Added!', `Added ${newChar.name} (${newChar.student}) to the cast.`, 'success');
+    }
+
+    function removeCharacterFromCast(charId) {
+      if (comicState.characters.length <= 2) {
+        showToast('Minimum Cast Size', 'A comic needs at least 2 characters.', 'info');
+        return;
+      }
+      const fallbackCharId = comicState.characters.find(c => c.id !== charId).id;
+      comicState.characters = comicState.characters.filter(c => c.id !== charId);
+      comicState.panels.forEach(p => {
+        p.lines.forEach(l => {
+          if (l.characterId === charId) l.characterId = fallbackCharId;
+        });
+      });
+      if (activeRoleFilter === charId) activeRoleFilter = 'all';
+      if (soloCharacterId === charId) soloCharacterId = fallbackCharId;
+      renderAll();
+    }
+
+    /**
+     * IPAD STUDENT BOOTH MODE & NAVIGATION
+     */
+    function openBoothPicker(show) {
+      const modal = document.getElementById('ipadBoothPickerModal');
+      const closeBtn = document.getElementById('closeBoothPickerBtn');
+      if (!modal) return;
+
+      if (show) {
+        renderBoothPickerModal();
+        modal.classList.remove('hidden');
+        if (closeBtn) closeBtn.classList.remove('hidden');
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    function renderBoothPickerModal() {
+      const storyContainer = document.getElementById('boothStoryButtons');
+      const charContainer = document.getElementById('boothCharacterButtons');
+      const roomInput = document.getElementById('boothRoomCodeInput');
+      if (roomInput) roomInput.value = activeRoomCode;
+
+      if (storyContainer) {
+        storyContainer.innerHTML = Object.entries(STORY_PRESETS).map(([key, preset]) => {
+          const isSelected = key === activePresetKey;
+          const charNames = preset.characters.map(c => c.name).join(', ');
+          return `
+            <button type="button" onclick="selectBoothStory('${key}')"
+              class="text-left p-3.5 rounded-2xl border-3 border-comicInk transition ${
+                isSelected ? 'bg-comicYellow shadow-comic-sm' : 'bg-white hover:bg-amber-50'
+              }">
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-comicTitle text-xl tracking-wide text-comicInk">${escapeHtml(preset.title)}</span>
+                ${isSelected ? '<i class="fa-solid fa-circle-check text-comicInk"></i>' : ''}
+              </div>
+              <p class="text-xs font-bold text-slate-600 mt-0.5">
+                ${preset.characters.length} Students: ${escapeHtml(charNames)}
+              </p>
+            </button>
+          `;
+        }).join('');
+      }
+
+      if (charContainer) {
+        charContainer.innerHTML = comicState.characters.map((charObj) => {
+          const theme = getCharacterTheme(charObj);
+          const lineCount = comicState.panels.reduce(
+            (sum, p) => sum + p.lines.filter(l => l.characterId === charObj.id).length,
+            0
+          );
+          return `
+            <button type="button" onclick="launchStudentBooth('${charObj.id}')"
+              class="comic-btn ${theme.cardBg} hover:brightness-95 p-4 rounded-2xl text-left flex items-center justify-between gap-3">
+              <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl ${theme.badgeBg} comic-border flex items-center justify-center text-xl font-black shrink-0">
+                  ${escapeHtml(charObj.name.charAt(0).toUpperCase())}
+                </div>
+                <div>
+                  <div class="font-comicTitle text-2xl tracking-wide text-comicInk leading-none">
+                    I AM ${escapeHtml(charObj.name.toUpperCase())}
+                  </div>
+                  <div class="text-xs font-extrabold text-slate-600 mt-1">
+                    ${lineCount} line${lineCount === 1 ? '' : 's'} to record
+                  </div>
+                </div>
+              </div>
+              <i class="fa-solid fa-arrow-right text-lg text-comicInk"></i>
+            </button>
+          `;
+        }).join('');
+      }
+    }
+
+    function selectBoothStory(presetKey) {
+      if (presetKey !== activePresetKey) {
+        switchStoryPreset(presetKey);
+      }
+      renderBoothPickerModal();
+    }
+
+    function launchStudentBooth(charId) {
+      stopAllPlayback();
+      if (recordingTarget) stopRecording();
+      soloCharacterId = charId;
+      studioMode = 'booth';
+      openBoothPicker(false);
+      renderAll();
+    }
+
+    function enterDirectorMode() {
+      stopAllPlayback();
+      if (recordingTarget) stopRecording();
+      studioMode = 'director';
+      activeRoleFilter = 'all';
+      openBoothPicker(false);
+      renderAll();
+    }
+
+    /**
+     * RENDERING: DEDICATED SINGLE-STUDENT IPAD BOOTH VIEW (ONLY THEIR OWN LINES)
+     */
+    function renderStudentSoloView() {
+      const bannerEl = document.getElementById('studentSoloBanner');
+      const linesEl = document.getElementById('studentSoloLinesContainer');
+      const charObj = getCharacterById(soloCharacterId);
+      const theme = getCharacterTheme(charObj);
+
+      const myLines = [];
+      comicState.panels.forEach((panel, pIdx) => {
+        panel.lines.forEach((line) => {
+          if (line.characterId === charObj.id) {
+            myLines.push({
+              panel,
+              panelNum: pIdx + 1,
+              line
+            });
+          }
+        });
+      });
+
+      const recordedCount = myLines.filter(item => !!item.line.audioDataUrl).length;
+      const allDone = myLines.length > 0 && recordedCount === myLines.length;
+
+      bannerEl.innerHTML = `
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="flex items-center gap-4">
+            <div class="w-16 h-16 rounded-2xl ${theme.badgeBg} comic-border flex items-center justify-center font-comicTitle text-4xl shrink-0 shadow-comic-sm">
+              ${escapeHtml(charObj.name.charAt(0).toUpperCase())}
+            </div>
+            <div>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="${theme.badgeBg} border-2 border-comicInk px-3 py-0.5 rounded-full text-xs font-black uppercase">
+                  Character: ${escapeHtml(charObj.name)}
+                </span>
+                <span class="bg-comicYellow border-2 border-comicInk px-3 py-0.5 rounded-full text-xs font-black">
+                  ${recordedCount} of ${myLines.length} Recorded
+                </span>
+              </div>
+              <h2 class="font-comicTitle text-3xl sm:text-4xl tracking-wide text-comicInk mt-1">
+                ${escapeHtml(charObj.name.toUpperCase())}'S RECORDING BOOTH
+              </h2>
+              <div class="flex flex-wrap items-center gap-2 mt-1">
+                <label class="text-xs font-black text-slate-600 uppercase">Your Name:</label>
+                <input type="text" value="${escapeHtml(charObj.student)}"
+                  onchange="updateCharacterField('${charObj.id}', 'student', this.value)"
+                  placeholder="Type your name..."
+                  class="font-sans font-extrabold text-sm bg-amber-50 border-2 border-comicInk rounded-xl px-2.5 py-1 focus:outline-none" />
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            ${allDone ? `
+              <div class="bg-emerald-300 comic-border px-4 py-3 rounded-2xl text-xs sm:text-sm font-black flex items-center gap-2">
+                <i class="fa-solid fa-cloud-arrow-up text-lg"></i>
+                <span>All ${myLines.length} lines synced live to Teacher's screen!</span>
+              </div>
+            ` : ''}
+            <button onclick="exportRoleAudioPack('${charObj.id}')"
+              class="comic-btn ${allDone ? 'bg-white hover:bg-amber-50 text-comicInk' : theme.btnBg} font-black px-4 py-3 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2"
+              title="Optional backup download">
+              <i class="fa-solid fa-download"></i>
+              <span>Backup (.json)</span>
+            </button>
+          </div>
+        </div>
+      `;
+
+      linesEl.innerHTML = myLines.map((item, idx) => {
+        const { panel, panelNum, line } = item;
+        const isRecThis = recordingTarget && recordingTarget.lineId === line.id;
+        const isPlayThis = playingTarget && playingTarget.lineId === line.id;
+
+        return `
+          <div id="card-${panel.id}" class="bg-white comic-border rounded-3xl overflow-hidden shadow-comic transition-all ${
+            isRecThis ? 'panel-recording' : isPlayThis ? 'panel-playing' : ''
+          }">
+            <div class="bg-comicInk text-white px-4 py-2.5 flex items-center justify-between">
+              <span class="font-comicTitle text-2xl tracking-wider text-comicYellow">
+                MY LINE #${idx + 1} (SCENE ${panelNum})
+              </span>
+              ${line.audioDataUrl ? `
+                <span class="bg-emerald-400 text-comicInk text-xs font-black px-3 py-0.5 rounded-full flex items-center gap-1.5">
+                  <i class="fa-solid fa-check"></i> RECORDED (${formatDuration(line.duration)})
+                </span>
+              ` : `
+                <span class="bg-white/15 text-white text-xs font-extrabold px-3 py-0.5 rounded-full">
+                  Waiting for your voice
+                </span>
+              `}
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-12">
+              <div class="sm:col-span-5 h-44 sm:h-auto bg-slate-100 border-b-3 sm:border-b-0 sm:border-r-3 border-comicInk overflow-hidden">
+                ${panel.artType === 'svg'
+                  ? panel.artContent
+                  : `<img src="${escapeHtml(panel.artContent)}" alt="Scene ${panelNum}" class="w-full h-full object-cover" />`}
+              </div>
+
+              <div class="sm:col-span-7 p-5 flex flex-col justify-between gap-4 ${theme.cardBg}">
+                <div class="bg-white comic-border rounded-2xl p-4 shadow-comic-sm">
+                  <span class="inline-block ${theme.badgeBg} text-xs font-black px-2.5 py-0.5 rounded-full uppercase mb-2">
+                    ${escapeHtml(charObj.name)} says:
+                  </span>
+                  <p class="font-comicText font-bold text-xl sm:text-2xl text-comicInk leading-snug">
+                    "${escapeHtml(line.text)}"
+                  </p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2.5">
+                  <button type="button"
+                    onclick="${isRecThis ? 'stopRecording()' : `startRecordingLine('${panel.id}', '${line.id}')`}"
+                    class="flex-1 comic-btn ${
+                      isRecThis
+                        ? 'bg-comicRed text-white'
+                        : line.audioDataUrl
+                          ? 'bg-white hover:bg-amber-50 text-comicInk'
+                          : 'bg-comicRed hover:bg-red-500 text-white'
+                    } font-black py-3 px-4 rounded-2xl text-sm sm:text-base flex items-center justify-center gap-2">
+                    <i class="fa-solid ${isRecThis ? 'fa-stop' : 'fa-microphone'}"></i>
+                    <span>${isRecThis ? 'Stop Recording' : line.audioDataUrl ? 'Re-Record Line' : 'Record My Voice'}</span>
+                  </button>
+
+                  ${line.audioDataUrl ? `
+                    <button type="button" onclick="togglePlaySingleLine('${panel.id}', '${line.id}')"
+                      class="comic-btn ${isPlayThis ? 'bg-comicYellow text-comicInk' : 'bg-emerald-400 hover:bg-emerald-300 text-comicInk'} font-black py-3 px-4 rounded-2xl text-sm sm:text-base flex items-center gap-2">
+                      <i class="fa-solid ${isPlayThis ? 'fa-stop' : 'fa-play'}"></i>
+                      <span>${isPlayThis ? 'Stop' : 'Listen'}</span>
+                    </button>
+
+                    <button type="button" onclick="deleteLineAudio('${panel.id}', '${line.id}')"
+                      class="comic-btn bg-slate-100 hover:bg-red-100 text-comicRed font-bold py-3 px-3.5 rounded-2xl"
+                      title="Delete recording">
+                      <i class="fa-solid fa-trash"></i>
+                    </button>
+                  ` : ''}
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    /**
+     * RENDERING: DIRECTOR / TEACHER CAST & FULL COMIC GRID
+     */
+    function renderCastSection() {
+      const roleGroup = document.getElementById('roleFilterGroup');
+      const castGrid = document.getElementById('castRosterGrid');
+      if (!roleGroup || !castGrid) return;
+
+      const allBtn = `
+        <button type="button" onclick="setRoleFilter('all')"
+          class="px-3 py-1.5 rounded-xl text-xs font-black transition ${
+            activeRoleFilter === 'all'
+              ? 'bg-comicInk text-comicYellow shadow-comic-sm'
+              : 'text-comicInk hover:bg-white'
+          }">
+          All Characters (Director View)
+        </button>
+      `;
+
+      const charBtns = comicState.characters.map(charObj => {
+        const theme = getCharacterTheme(charObj);
+        const isActive = activeRoleFilter === charObj.id;
+        return `
+          <button type="button" onclick="setRoleFilter('${charObj.id}')"
+            class="px-3 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 ${
+              isActive
+                ? `${theme.badgeBg} border-2 border-comicInk shadow-comic-sm`
+                : 'text-comicInk hover:bg-white'
+            }">
+            <span class="w-2.5 h-2.5 rounded-full ${theme.dotBg} border border-comicInk"></span>
+            <span>${escapeHtml(charObj.student)} (${escapeHtml(charObj.name)})</span>
+          </button>
+        `;
+      }).join('');
+
+      roleGroup.innerHTML = allBtn + charBtns;
+
+      castGrid.innerHTML = comicState.characters.map((charObj) => {
+        const theme = getCharacterTheme(charObj);
+        let assignedCount = 0;
+        let recordedCount = 0;
+        comicState.panels.forEach(p => {
+          p.lines.forEach(l => {
+            if (l.characterId === charObj.id) {
+              assignedCount++;
+              if (l.audioDataUrl) recordedCount++;
+            }
+          });
+        });
+
+        return `
+          <div class="${theme.cardBg} border-3 border-comicInk rounded-2xl p-3.5 flex flex-col justify-between gap-3 shadow-comic-sm">
+            <div>
+              <div class="flex items-center justify-between gap-2 mb-2">
+                <button type="button" onclick="cycleCharacterColor('${charObj.id}')"
+                  class="${theme.badgeBg} border-2 border-comicInk px-2.5 py-0.5 rounded-full text-xs font-black flex items-center gap-1.5"
+                  title="Click to switch character color">
+                  <i class="fa-solid fa-palette text-[10px]"></i>
+                  <span>${theme.label}</span>
+                </button>
+
+                <div class="flex items-center gap-1.5">
+                  <span class="bg-white border border-comicInk px-2 py-0.5 rounded-full text-[11px] font-black">
+                    ${recordedCount}/${assignedCount} Clips
+                  </span>
+                  ${comicState.characters.length > 2 ? `
+                    <button type="button" onclick="removeCharacterFromCast('${charObj.id}')"
+                      class="text-slate-500 hover:text-comicRed p-1 text-xs"
+                      title="Remove character">
+                      <i class="fa-solid fa-trash"></i>
+                    </button>
+                  ` : ''}
+                </div>
+              </div>
+
+              <div class="space-y-2">
+                <div>
+                  <label class="block text-[10px] font-black uppercase text-slate-600">Character Name</label>
+                  <input type="text" value="${escapeHtml(charObj.name)}"
+                    onchange="updateCharacterField('${charObj.id}', 'name', this.value)"
+                    class="w-full font-comicText font-bold text-base bg-white border-2 border-comicInk rounded-xl px-2.5 py-1 focus:outline-none" />
+                </div>
+                <div>
+                  <label class="block text-[10px] font-black uppercase text-slate-600">Student Actor</label>
+                  <input type="text" value="${escapeHtml(charObj.student)}"
+                    onchange="updateCharacterField('${charObj.id}', 'student', this.value)"
+                    class="w-full font-sans font-bold text-xs bg-white border-2 border-comicInk rounded-xl px-2.5 py-1.5 focus:outline-none" />
+                </div>
+              </div>
+            </div>
+
+            <button type="button" onclick="exportRoleAudioPack('${charObj.id}')"
+              class="w-full comic-btn ${theme.btnBg} font-black px-3 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-file-export"></i>
+              <span>Export ${escapeHtml(charObj.student)}'s Audio (.json)</span>
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderComic() {
+      const grid = document.getElementById('comicGrid');
+      if (!grid) return;
+
+      grid.innerHTML = comicState.panels.map((panel, pIdx) => {
+        const isPanelRec = recordingTarget && recordingTarget.panelId === panel.id;
+        const isPanelPlay = playingTarget && playingTarget.panelId === panel.id;
+
+        const linesHtml = panel.lines.map((line, lIdx) => {
+          const charObj = getCharacterById(line.characterId);
+          const theme = getCharacterTheme(charObj);
+          const isLocked = activeRoleFilter !== 'all' && activeRoleFilter !== line.characterId;
+          const isRecLine = recordingTarget && recordingTarget.lineId === line.id;
+          const isPlayLine = playingTarget && playingTarget.lineId === line.id;
+          const bubbleSideClass = lIdx % 2 === 0 ? 'speech-bubble-left' : 'speech-bubble-right';
+
+          return `
+            <div class="${bubbleSideClass} ${theme.bubbleBg} p-3.5 transition-all ${
+              isPlayLine ? 'bubble-speaking' : ''
+            } ${isLocked ? 'opacity-60' : ''}">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <div class="flex items-center gap-1.5">
+                  <button type="button" onclick="cycleLineCharacter('${panel.id}', '${line.id}')"
+                    class="${theme.badgeBg} border-2 border-comicInk px-2.5 py-0.5 rounded-full text-xs font-black flex items-center gap-1"
+                    title="Click to switch speaker">
+                    <span>${escapeHtml(charObj.name)}</span>
+                    <i class="fa-solid fa-repeat text-[10px] opacity-80"></i>
+                  </button>
+                  <span class="text-[11px] font-extrabold text-slate-600">
+                    (${escapeHtml(charObj.student)})
+                  </span>
+                  ${activeRoleFilter !== 'all' ? (
+                    isLocked
+                      ? `<span class="bg-slate-200 text-slate-700 text-[10px] font-black px-2 py-0.5 rounded-full"><i class="fa-solid fa-lock mr-1"></i>Assigned to ${escapeHtml(charObj.student)}</span>`
+                      : `<span class="bg-comicYellow border border-comicInk text-comicInk text-[10px] font-black px-2 py-0.5 rounded-full">Your Line!</span>`
+                  ) : ''}
+                </div>
+
+                <div class="flex items-center gap-1.5">
+                  ${line.audioDataUrl ? `
+                    <span class="bg-emerald-300 border border-comicInk text-comicInk text-[10px] font-black px-2 py-0.5 rounded-full">
+                      <i class="fa-solid fa-check mr-0.5"></i> ${formatDuration(line.duration)}
+                    </span>
+                  ` : ''}
+                  ${panel.lines.length > 1 ? `
+                    <button type="button" onclick="removeDialogueLine('${panel.id}', '${line.id}')"
+                      class="text-slate-400 hover:text-comicRed text-xs px-1"
+                      title="Remove speech bubble">
+                      <i class="fa-solid fa-xmark"></i>
+                    </button>
+                  ` : ''}
+                </div>
+              </div>
+
+              <textarea rows="2"
+                onchange="updateLineText('${panel.id}', '${line.id}', this.value)"
+                class="w-full font-comicText font-bold text-base sm:text-lg bg-white/90 border-2 border-comicInk/30 focus:border-comicInk rounded-xl p-2 resize-none focus:outline-none text-comicInk"
+              >${escapeHtml(line.text)}</textarea>
+
+              <div class="flex flex-wrap items-center gap-2 mt-2.5">
+                <button type="button"
+                  ${isLocked ? 'disabled' : ''}
+                  onclick="${isRecLine ? 'stopRecording()' : `startRecordingLine('${panel.id}', '${line.id}')`}"
+                  class="comic-btn ${
+                    isRecLine
+                      ? 'bg-comicRed text-white'
+                      : line.audioDataUrl
+                        ? 'bg-white hover:bg-amber-50 text-comicInk'
+                        : 'bg-comicRed hover:bg-red-500 text-white'
+                  } font-black px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5">
+                  <i class="fa-solid ${isRecLine ? 'fa-stop' : 'fa-microphone'}"></i>
+                  <span>${isRecLine ? 'Stop' : line.audioDataUrl ? 'Re-Record' : 'Record'}</span>
+                </button>
+
+                ${line.audioDataUrl ? `
+                  <button type="button" onclick="togglePlaySingleLine('${panel.id}', '${line.id}')"
+                    class="comic-btn ${isPlayLine ? 'bg-comicYellow text-comicInk' : 'bg-emerald-400 hover:bg-emerald-300 text-comicInk'} font-black px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5">
+                    <i class="fa-solid ${isPlayLine ? 'fa-stop' : 'fa-play'}"></i>
+                    <span>${isPlayLine ? 'Stop' : 'Play'}</span>
+                  </button>
+
+                  ${!isLocked ? `
+                    <button type="button" onclick="deleteLineAudio('${panel.id}', '${line.id}')"
+                      class="comic-btn bg-slate-100 hover:bg-red-100 text-comicRed font-bold px-2.5 py-1.5 rounded-xl text-xs"
+                      title="Delete clip">
+                      <i class="fa-solid fa-trash"></i>
+                    </button>
+                  ` : ''}
+                ` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <article id="card-${panel.id}" class="bg-comicPaper comic-border-thick rounded-3xl overflow-hidden shadow-comic flex flex-col transition-all ${
+            isPanelRec ? 'panel-recording' : isPanelPlay ? 'panel-playing' : ''
+          }">
+            <!-- Panel Header -->
+            <div class="bg-comicInk text-white px-4 py-2.5 flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2.5">
+                <span class="w-7 h-7 rounded-lg bg-comicYellow text-comicInk font-comicTitle text-xl flex items-center justify-center">
+                  ${pIdx + 1}
+                </span>
+                <span class="font-comicTitle text-xl tracking-wider">PANEL #${pIdx + 1}</span>
+              </div>
+
+              <div class="flex items-center gap-1.5">
+                <button type="button" onclick="triggerPanelArtUpload('${panel.id}')"
+                  class="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition">
+                  <i class="fa-solid fa-image text-comicYellow"></i>
+                  <span>Upload Art</span>
+                </button>
+                ${comicState.panels.length > 1 ? `
+                  <button type="button" onclick="deletePanel('${panel.id}')"
+                    class="bg-comicRed/80 hover:bg-comicRed text-white text-xs font-bold px-2.5 py-1 rounded-lg transition"
+                    title="Delete Panel">
+                    <i class="fa-solid fa-trash"></i>
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+
+            <!-- Panel Illustration -->
+            <div onclick="triggerPanelArtUpload('${panel.id}')"
+              class="h-48 sm:h-52 bg-slate-100 border-b-3 border-comicInk overflow-hidden cursor-pointer relative group">
+              ${panel.artType === 'svg'
+                ? panel.artContent
+                : `<img src="${escapeHtml(panel.artContent)}" alt="Panel ${pIdx + 1}" class="w-full h-full object-cover" />`}
+            </div>
+
+            <!-- Speech Bubbles Stack -->
+            <div class="p-4 sm:p-5 space-y-4 flex-1 flex flex-col justify-between">
+              <div class="space-y-4">
+                ${linesHtml}
+              </div>
+
+              <div class="pt-2 border-t border-dashed border-slate-300 flex justify-between items-center">
+                <button type="button" onclick="addDialogueLine('${panel.id}')"
+                  class="text-xs font-black text-comicBlue hover:underline flex items-center gap-1">
+                  <i class="fa-solid fa-comment-medical"></i>
+                  <span>+ Add Speech Bubble</span>
+                </button>
+                <span class="text-[11px] font-bold text-slate-400">
+                  ${panel.lines.length} line${panel.lines.length === 1 ? '' : 's'}
+                </span>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join('');
+    }
+
+    function renderAll() {
+      const isBooth = studioMode === 'booth';
+
+      const soloBanner = document.getElementById('studentSoloBanner');
+      const soloLines = document.getElementById('studentSoloLinesContainer');
+      const directorCast = document.getElementById('directorCastSection');
+      const comicGrid = document.getElementById('comicGrid');
+
+      const modeBadge = document.getElementById('studioModeBadge');
+      const headerSubtitle = document.getElementById('studioHeaderSubtitle');
+      const playFullBtn = document.getElementById('playFullComicBtn');
+      const addPanelBtn = document.getElementById('addPanelHeaderBtn');
+      const directorProjectBtns = document.getElementById('directorProjectBtns');
+
+      if (isBooth) {
+        if (soloBanner) soloBanner.classList.remove('hidden');
+        if (soloLines) soloLines.classList.remove('hidden');
+        if (directorCast) directorCast.classList.add('hidden');
+        if (comicGrid) comicGrid.classList.add('hidden');
+
+        if (modeBadge) modeBadge.textContent = 'iPad Student Booth';
+        if (headerSubtitle) headerSubtitle.textContent = 'Each student sees only their own lines on their iPad!';
+        if (playFullBtn) playFullBtn.classList.add('hidden');
+        if (addPanelBtn) addPanelBtn.classList.add('hidden');
+        if (directorProjectBtns) directorProjectBtns.classList.add('hidden');
+
+        renderStudentSoloView();
+      } else {
+        if (soloBanner) soloBanner.classList.add('hidden');
+        if (soloLines) soloLines.classList.add('hidden');
+        if (directorCast) directorCast.classList.remove('hidden');
+        if (comicGrid) comicGrid.classList.remove('hidden');
+
+        if (modeBadge) modeBadge.textContent = 'Teacher / Director View';
+        if (headerSubtitle) headerSubtitle.textContent = 'Live classroom view — play everyone’s recorded voices together!';
+        if (playFullBtn) playFullBtn.classList.remove('hidden');
+        if (addPanelBtn) addPanelBtn.classList.remove('hidden');
+        if (directorProjectBtns) directorProjectBtns.classList.remove('hidden');
+
+        renderCastSection();
+        renderComic();
+      }
+    }
+
+    function updateLineText(panelId, lineId, newText) {
+      const panel = comicState.panels.find(p => p.id === panelId);
+      const line = panel ? panel.lines.find(l => l.id === lineId) : null;
+      if (line) {
+        line.text = newText;
+      }
+    }
+
+    function cycleLineCharacter(panelId, lineId) {
+      const panel = comicState.panels.find(p => p.id === panelId);
+      const line = panel ? panel.lines.find(l => l.id === lineId) : null;
+      if (!line) return;
+
+      const currentIdx = comicState.characters.findIndex(c => c.id === line.characterId);
+      const nextIdx = (currentIdx + 1) % comicState.characters.length;
+      line.characterId = comicState.characters[nextIdx].id;
+      renderAll();
+    }
+
+    function updateCharacterField(charId, field, value) {
+      const charObj = comicState.characters.find(c => c.id === charId);
+      if (!charObj) return;
+
+      charObj[field] = value.trim() || (field === 'name' ? 'Character' : 'Student');
+      renderAll();
+    }
+
+    function deleteLineAudio(panelId, lineId) {
+      if (playingTarget && playingTarget.lineId === lineId) stopAllPlayback();
+      const panel = comicState.panels.find(p => p.id === panelId);
+      const line = panel ? panel.lines.find(l => l.id === lineId) : null;
+      if (line) {
+        line.audioDataUrl = null;
+        line.duration = 0;
+        if (typeof window.deleteClipFromCloud === 'function') {
+          window.deleteClipFromCloud(activeRoomCode, activePresetKey, lineId);
+        }
+        renderAll();
+        showToast('Clip Removed', 'Audio deleted. Ready to re-record!', 'info');
+      }
+    }
+
+    function addDialogueLine(panelId) {
+      const panel = comicState.panels.find(p => p.id === panelId);
+      if (!panel) return;
+
+      const lastLine = panel.lines[panel.lines.length - 1];
+      let nextCharId = comicState.characters[0].id;
+
+      if (lastLine) {
+        const lastIdx = comicState.characters.findIndex(c => c.id === lastLine.characterId);
+        nextCharId = comicState.characters[(lastIdx + 1) % comicState.characters.length].id;
+      }
+
+      panel.lines.push({
+        id: 'line-' + Date.now(),
+        characterId: nextCharId,
+        text: 'Add your character dialogue here!',
+        audioDataUrl: null,
+        duration: 0
+      });
+      renderAll();
+    }
+
+    function removeDialogueLine(panelId, lineId) {
+      const panel = comicState.panels.find(p => p.id === panelId);
+      if (!panel || panel.lines.length <= 1) return;
+      if (playingTarget && playingTarget.lineId === lineId) stopAllPlayback();
+
+      panel.lines = panel.lines.filter(l => l.id !== lineId);
+      renderAll();
+    }
+
+    function addNewPanel() {
+      const num = comicState.panels.length + 1;
+      const lines = comicState.characters.slice(0, 3).map((charObj, i) => ({
+        id: 'line-' + (Date.now() + i + 1),
+        characterId: charObj.id,
+        text: i === 0
+          ? 'What happens next in our adventure?'
+          : i === 1
+            ? 'Let’s work together to find out!'
+            : 'My calculations say we are right on track!',
+        audioDataUrl: null,
+        duration: 0
+      }));
+
+      comicState.panels.push({
+        id: 'panel-' + Date.now(),
+        artType: 'image',
+        artContent: `https://placehold.co/600x280/0284C7/FFFFFF?text=Panel+%23${num}+-+Click+Art+to+Upload`,
+        lines
+      });
+      renderAll();
+      showToast('Panel Added!', `Panel #${num} is ready for dialogue and voices.`, 'success');
+    }
+
+    function deletePanel(panelId) {
+      if (comicState.panels.length <= 1) return;
+      if (playingTarget && playingTarget.panelId === panelId) stopAllPlayback();
+
+      comicState.panels = comicState.panels.filter(p => p.id !== panelId);
+      renderAll();
+      showToast('Panel Deleted', 'Removed panel from the comic strip.', 'info');
+    }
+
+    function triggerPanelArtUpload(panelId) {
+      activePanelIdForUpload = panelId;
+      document.getElementById('panelImageInput').click();
+    }
+
+    function setupFileInputListeners() {
+      // 1. Panel Artwork Image Upload
+      document.getElementById('panelImageInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file || !activePanelIdForUpload) return;
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const panel = comicState.panels.find(p => p.id === activePanelIdForUpload);
+          if (panel) {
+            panel.artType = 'image';
+            panel.artContent = ev.target.result;
+            renderAll();
+            showToast('Artwork Updated!', 'Your custom comic panel image has been added.', 'success');
+          }
+          e.target.value = '';
+        };
+        reader.readAsDataURL(file);
+      });
+
+      // 2. Import Partner Audio Pack (.json)
+      document.getElementById('importAudioPackInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const parsed = JSON.parse(ev.target.result);
+            handleImportedAudioPack(parsed);
+          } catch (err) {
+            showToast('Read Error', 'Could not read that JSON audio pack file.', 'error');
+          }
+          e.target.value = '';
+        };
+        reader.readAsText(file);
+      });
+
+      // 3. Load Full Project (.json)
+      document.getElementById('loadFullProjectInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const parsed = JSON.parse(ev.target.result);
+            if (parsed && parsed.type === 'comic-voice-studio-full-project' && parsed.state) {
+              stopAllPlayback();
+              comicState = parsed.state;
+              document.getElementById('comicStoryTitle').value = comicState.title;
+              activeRoleFilter = 'all';
+              renderAll();
+              showToast('Project Loaded!', `Loaded "${comicState.title}" successfully.`, 'success');
+            } else {
+              showToast('Invalid Project File', 'Please select a full project .json file.', 'error');
+            }
+          } catch (err) {
+            showToast('Read Error', 'Could not open that project file.', 'error');
+          }
+          e.target.value = '';
+        };
+        reader.readAsText(file);
+      });
+    }
+
+    let toastTimeout = null;
+    function showToast(title, message, type = 'info') {
+      const banner = document.getElementById('toastBanner');
+      const iconBox = document.getElementById('toastIcon');
+      document.getElementById('toastTitle').textContent = title;
+      document.getElementById('toastMessage').textContent = message;
+
+      iconBox.className = 'w-8 h-8 rounded-full comic-border flex items-center justify-center shrink-0 mt-0.5 ';
+      if (type === 'error') {
+        iconBox.classList.add('bg-comicRed', 'text-white');
+        iconBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+      } else if (type === 'success') {
+        iconBox.classList.add('bg-emerald-400', 'text-comicInk');
+        iconBox.innerHTML = '<i class="fa-solid fa-check"></i>';
+      } else {
+        iconBox.classList.add('bg-comicYellow', 'text-comicInk');
+        iconBox.innerHTML = '<i class="fa-solid fa-bolt"></i>';
+      }
+
+      banner.classList.remove('hidden');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(hideToast, 5200);
+    }
+
+    function hideToast() {
+      const banner = document.getElementById('toastBanner');
+      if (banner) banner.classList.add('hidden');
+    }
+
+    function toggleGuideModal(show) {
+      const modal = document.getElementById('guideModal');
+      if (!modal) return;
+      if (show) {
+        modal.classList.remove('hidden');
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      setupFileInputListeners();
+      renderBoothPickerModal();
+      renderAll();
+    });
+  </script>
+</body>
+</html>
